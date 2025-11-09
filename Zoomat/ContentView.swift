@@ -9,53 +9,47 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var showingQRScanner = false
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
+        TabView {
+            EventListView()
+                .tabItem {
+                    Label("Events", systemImage: "calendar")
                 }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
+            ContactListView()
+                .tabItem {
+                    Label("Contacts", systemImage: "person.2")
+                }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            TemplateListView()
+                .tabItem {
+                    Label("Templates", systemImage: "photo.on.rectangle")
+                }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // Floating QR Scanner Button
+            Button {
+                showingQRScanner = true
+            } label: {
+                Image(systemName: "qrcode.viewfinder")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 60, height: 60)
+                    .background(Color.accentColor)
+                    .clipShape(Circle())
+                    .shadow(radius: 4)
             }
+            .padding()
+        }
+        .sheet(isPresented: $showingQRScanner) {
+            QRScannerView()
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(previewContainer)
 }
