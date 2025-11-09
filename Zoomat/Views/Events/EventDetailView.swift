@@ -69,7 +69,7 @@ struct EventDetailView: View {
                     VStack(alignment: .leading) {
                         Text(template.name)
                             .font(.headline)
-                        Text("QR Size: \(Int(template.qrSize * 100))%")
+                        Text("QR Size: \(template.qrSize, format: .percent.precision(.fractionLength(0)))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

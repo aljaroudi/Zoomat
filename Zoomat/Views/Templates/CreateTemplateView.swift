@@ -56,13 +56,13 @@ struct CreateTemplateView: View {
                         }
 
                         VStack(alignment: .leading) {
-                            Text("X Position: \(qrPositionX, format: .percent)")
+                            Text("X Position: \(qrPositionX, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: $qrPositionX, in: 0...1)
                         }
 
                         VStack(alignment: .leading) {
-                            Text("Y Position: \(qrPositionY, format: .percent)")
+                            Text("Y Position: \(qrPositionY, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: $qrPositionY, in: 0...1)
                         }
@@ -72,10 +72,10 @@ struct CreateTemplateView: View {
                             let percentage = qrSize / minDimension
 
                             VStack(alignment: .leading) {
-                                Text("Size: \(percentage, format: .percent)")
+                                Text("Size: \(percentage, format: .percent.precision(.fractionLength(0)))")
                                     .font(.caption)
                                 Slider(value: Binding(
-                                    get: { qrSize / minDimension },
+                                    get: { percentage },
                                     set: { qrSize = $0 * minDimension }
                                 ), in: 0.1...1.0)
                             }
@@ -170,26 +170,26 @@ struct EditTemplateView: View {
                     }
 
                     VStack(alignment: .leading) {
-                        Text("X Position: \(Int(template.qrPositionX * 100))%")
+                        Text("X Position: \(template.qrPositionX, format: .percent.precision(.fractionLength(0)))")
                             .font(.caption)
                         Slider(value: $template.qrPositionX, in: 0...1)
                     }
 
                     VStack(alignment: .leading) {
-                        Text("Y Position: \(Int(template.qrPositionY * 100))%")
+                        Text("Y Position: \(template.qrPositionY, format: .percent.precision(.fractionLength(0)))")
                             .font(.caption)
                         Slider(value: $template.qrPositionY, in: 0...1)
                     }
 
                     if let uiImage = UIImage(data: displayImageData) {
                         let minDimension = min(uiImage.size.width, uiImage.size.height)
-                        let percentage = Int((template.qrSize / minDimension) * 100)
+                        let percentage = template.qrSize / minDimension
 
                         VStack(alignment: .leading) {
-                            Text("Size: \(percentage)%")
+                            Text("Size: \(percentage, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: Binding(
-                                get: { template.qrSize / minDimension },
+                                get: { percentage },
                                 set: { template.qrSize = $0 * minDimension }
                             ), in: 0.1...1.0)
                         }

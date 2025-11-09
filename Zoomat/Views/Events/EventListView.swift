@@ -8,9 +8,6 @@
 import SwiftUI
 import SwiftData
 
-import SwiftUI
-import SwiftData
-
 struct EventListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Event.date, order: .reverse) private var events: [Event]
