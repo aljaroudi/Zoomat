@@ -162,9 +162,11 @@ enum DataSchema: VersionedSchema {
 
         @Attribute(.externalStorage) var imageData: Data
 
-        // QR code placement
+        /// Horizontal position as a percentage
         var qrPositionX: Double
+        /// Vertical position as a percentage
         var qrPositionY: Double
+        /// Percentage of the smallest image dimension
         var qrSize: Double
 
         @Relationship(deleteRule: .nullify, inverse: \Event.template)
@@ -188,7 +190,7 @@ enum DataSchema: VersionedSchema {
                 imageData: UIImage(named: "MockTemplate")!.jpegData(compressionQuality: 0.8)!,
                 qrPositionX: 0.5,
                 qrPositionY: 0.5,
-                qrSize: 100
+                qrSize: 0.3 // 30% of smallest dimension
             )
         }
 

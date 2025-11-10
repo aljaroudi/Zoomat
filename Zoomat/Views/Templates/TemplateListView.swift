@@ -121,7 +121,7 @@ struct TemplateDetailView: View {
                         LabeledContent("Name", value: template.name)
                         LabeledContent("QR X Position", value: "\(Int(template.qrPositionX * 100))%")
                         LabeledContent("QR Y Position", value: "\(Int(template.qrPositionY * 100))%")
-                        LabeledContent("QR Size", value: "\(Int(template.qrSize))pt")
+                        LabeledContent("QR Size", value: "\(Int(template.qrSize * 100))%")
                     }
 
                     Divider()
@@ -173,20 +173,29 @@ struct TemplatePreview: View {
                     .resizable()
                     .scaledToFit()
 
+                // Calculate QR size based on smallest dimension of the preview
+                let imageSize = image.size
+                let scale = min(geometry.size.width / imageSize.width, geometry.size.height / imageSize.height)
+                let scaledWidth = imageSize.width * scale
+                let scaledHeight = imageSize.height * scale
+                let minDimension = min(scaledWidth, scaledHeight)
+                let qrPixelSize = minDimension * qrSize
+
                 // QR code placeholder
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.black.opacity(0.3))
                     .overlay {
                         Image(systemName: "qrcode")
-                            .font(.system(size: qrSize * 0.3))
+                            .font(.system(size: qrPixelSize * 0.3))
                             .foregroundStyle(.white)
                     }
-                    .frame(width: qrSize, height: qrSize)
+                    .frame(width: qrPixelSize, height: qrPixelSize)
                     .position(
-                        x: geometry.size.width * qrPositionX,
-                        y: geometry.size.height * qrPositionY
+                        x: scaledWidth * qrPositionX,
+                        y: scaledHeight * qrPositionY
                     )
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
 }
@@ -200,10 +209,10 @@ struct TemplatePreview: View {
     let container = previewContainer
     let template = Template(
         name: "Wedding Template",
-        imageData: UIImage(systemName: "photo")!.pngData()!,
+        imageData: UIImage(named: "MockTemplate")!.pngData()!,
         qrPositionX: 0.5,
         qrPositionY: 0.5,
-        qrSize: 100
+        qrSize: 0.3
     )
     container.mainContext.insert(template)
 
