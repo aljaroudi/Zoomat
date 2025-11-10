@@ -13,17 +13,11 @@ struct QRScannerView: View {
             // Camera preview as background
             QRScannerCameraView(scanner: scanner)
                 .ignoresSafeArea()
-                .blur(radius: 4)
-                .opacity(0.3)
+                .opacity(0.4)
 
-            // Status overlay
-            VStack {
-                Spacer()
-
-                statusOverlay
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 60)
-            }
+            // Status overlay - full screen
+            statusOverlay
+                .ignoresSafeArea()
         }
         .navigationTitle("Check In")
         .navigationBarTitleDisplayMode(.inline)
@@ -59,12 +53,14 @@ struct QRScannerView: View {
         case .alreadyCheckedIn(let invite, _):
             alreadyCheckedInView(invite: invite)
         case .failure(let reason):
-            failureView(reason: reason)
+            failureView()
         }
     }
 
     private var scanningView: some View {
         VStack(spacing: 16) {
+            Spacer()
+
             Image(systemName: "qrcode.viewfinder")
                 .font(.system(size: 60))
                 .foregroundStyle(.white)
@@ -72,35 +68,48 @@ struct QRScannerView: View {
             Text("Scanning for check-in code...")
                 .font(.headline)
                 .foregroundStyle(.white)
+
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Material.ultraThin)
     }
 
     private func successView(invite: Invite) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.white)
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: 80)
 
-            VStack(spacing: 8) {
-                Text(invite.contact.name)
-                    .font(.largeTitle)
+            // Contact name at top
+            Text(invite.contact.name)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 32)
+
+            Spacer()
+
+            // Center content
+            VStack(spacing: 20) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 80))
                     .foregroundStyle(.white)
 
                 Text(invite.event.title)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                if invite.checkIns.count > 1 {
+                    Text("Check-in #\(invite.checkIns.count, format: .number)")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
             }
 
-            if invite.checkIns.count > 1 {
-                Text("Check-in #\(invite.checkIns.count, format: .number)")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
+            Spacer()
 
+            // Button at bottom
             Button {
                 checkInStatus = .waiting
             } label: {
@@ -112,45 +121,50 @@ struct QRScannerView: View {
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding(.top, 8)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 60)
         }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-        .background(.green)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.thinMaterial)
+        .background(.green.opacity(0.6))
     }
 
     private func alreadyCheckedInView(invite: Invite) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.white)
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: 80)
 
-            VStack(spacing: 8) {
-                Text(invite.contact.name)
-                    .font(.largeTitle)
+            // Contact name at top
+            Text(invite.contact.name)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 32)
+
+            Spacer()
+
+            // Center content
+            VStack(spacing: 20) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 80))
                     .foregroundStyle(.white)
 
                 Text("Already Checked In")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.9))
-            }
+                    .font(.title2)
+                    .foregroundStyle(.white.opacity(0.95))
 
-            if case .alreadyCheckedIn(_, let previousCount) = checkInStatus,
-               previousCount > 0,
-               let lastCheckIn = invite.checkIns.dropLast().last {
-                VStack(spacing: 4) {
-                    Text("Check-in #\(invite.checkIns.count, format: .number)")
+                if case .alreadyCheckedIn(_, let previousCount) = checkInStatus,
+                   previousCount > 0,
+                   let lastCheckIn = invite.checkIns.dropLast().last {
+                    // x minutes ago ago
+                    Text(lastCheckIn.created.formatted(.relative(presentation: .named)))
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.9))
-
-                    Text("Last check-in: \(lastCheckIn.created.formatted(.relative(presentation: .named)))")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.8))
                 }
-                .padding(.vertical, 8)
             }
 
+            Spacer()
+
+            // Button at bottom
             Button {
                 checkInStatus = .waiting
             } label: {
@@ -162,31 +176,32 @@ struct QRScannerView: View {
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding(.top, 8)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 60)
         }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-        .background(.orange)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.thinMaterial)
+        .background(.orange.opacity(0.6))
     }
 
-    private func failureView(reason: String) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.white)
+    private func failureView() -> some View {
+        VStack(spacing: 0) {
+            Spacer()
 
-            VStack(spacing: 8) {
-                Text("Invalid Code")
-                    .font(.title2.bold())
+            // Center content
+            VStack(spacing: 20) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 80))
                     .foregroundStyle(.white)
 
-                Text(reason)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
+                Text("Invalid Code")
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundStyle(.white)
             }
 
+            Spacer()
+
+            // Button at bottom
             Button {
                 checkInStatus = .waiting
             } label: {
@@ -198,12 +213,12 @@ struct QRScannerView: View {
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding(.top, 8)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 60)
         }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-        .background(.red)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.thinMaterial)
+        .background(.red.opacity(0.6))
     }
 
     private func handleScannedCode(_ code: String) {
@@ -349,116 +364,9 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     }
 }
 
-#Preview("Scanning") {
+#Preview {
     NavigationStack {
         QRScannerView()
-    }
-    .modelContainer(previewContainer)
-}
-
-#Preview("Success - First Check-In") {
-    let container = previewContainer
-    let context = container.mainContext
-
-    let contact = Contact(name: "Alice Johnson", email: "alice@example.com")
-    let event = Event(title: "Tech Conference 2024", subtitle: "Annual Meetup", date: .now)
-    let invite = Invite(contact: contact, event: event)
-
-    context.insert(contact)
-    context.insert(event)
-    context.insert(invite)
-
-    var view = QRScannerView()
-    view.checkInStatus = .success(invite: invite)
-
-    return NavigationStack {
-        view
-    }
-    .modelContainer(container)
-}
-
-#Preview("Already Checked In - 3rd Time") {
-    let container = previewContainer
-    let context = container.mainContext
-
-    let contact = Contact(name: "Bob Smith", email: "bob@example.com")
-    let event = Event(title: "Wedding Reception", subtitle: "Celebrating our union", date: .now)
-    let invite = Invite(contact: contact, event: event)
-
-    context.insert(contact)
-    context.insert(event)
-    context.insert(invite)
-
-    // Add previous check-ins
-    let checkIn1 = CheckIn(invite: invite)
-    checkIn1.created = Date().addingTimeInterval(-3600 * 2) // 2 hours ago
-    context.insert(checkIn1)
-
-    let checkIn2 = CheckIn(invite: invite)
-    checkIn2.created = Date().addingTimeInterval(-1800) // 30 minutes ago
-    context.insert(checkIn2)
-
-    let checkIn3 = CheckIn(invite: invite)
-    context.insert(checkIn3)
-
-    try? context.save()
-
-    var view = QRScannerView()
-    view.checkInStatus = .alreadyCheckedIn(invite: invite, previousCount: 2)
-
-    return NavigationStack {
-        view
-    }
-    .modelContainer(container)
-}
-
-#Preview("Already Checked In - 2nd Time") {
-    let container = previewContainer
-    let context = container.mainContext
-
-    let contact = Contact(name: "Carol White", email: "carol@example.com")
-    let event = Event(title: "Company Party", date: .now)
-    let invite = Invite(contact: contact, event: event)
-
-    context.insert(contact)
-    context.insert(event)
-    context.insert(invite)
-
-    // Add previous check-in
-    let checkIn1 = CheckIn(invite: invite)
-    checkIn1.created = Date().addingTimeInterval(-2580) // 43 minutes ago
-    context.insert(checkIn1)
-
-    let checkIn2 = CheckIn(invite: invite)
-    context.insert(checkIn2)
-
-    try? context.save()
-
-    var view = QRScannerView()
-    view.checkInStatus = .alreadyCheckedIn(invite: invite, previousCount: 1)
-
-    return NavigationStack {
-        view
-    }
-    .modelContainer(container)
-}
-
-#Preview("Failure - Invalid Code") {
-    var view = QRScannerView()
-    view.checkInStatus = .failure(reason: "QR code format is invalid")
-
-    return NavigationStack {
-        view
-    }
-    .modelContainer(previewContainer)
-}
-
-#Preview("Failure - Not Found") {
-    var view = QRScannerView()
-    view.checkInStatus = .failure(reason: "Invite not found in system")
-
-    return NavigationStack {
-        view
     }
     .modelContainer(previewContainer)
 }
