@@ -22,11 +22,6 @@ struct ContentView: View {
                 .tabItem {
                     Label("Contacts", systemImage: "person.2")
                 }
-
-            TemplateListView()
-                .tabItem {
-                    Label("Templates", systemImage: "photo.on.rectangle")
-                }
         }
         .overlay(alignment: .bottomTrailing) {
             // Floating QR Scanner Button

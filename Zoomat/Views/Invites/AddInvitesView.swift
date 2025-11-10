@@ -104,6 +104,7 @@ struct AddInvitesView: View {
             let invite = Invite(contact: contact, event: event)
             modelContext.insert(invite)
         }
+        try? modelContext.save()
 
         dismiss()
     }

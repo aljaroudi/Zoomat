@@ -13,19 +13,34 @@ struct EventDetailView: View {
     @Bindable var event: Event
     @State private var showingEditSheet = false
     @State private var showingAddInvites = false
+    @State private var showingDuplicateAlert = false
 
     var body: some View {
         List {
+            if event.imageData != nil {
+                imageSection
+            }
             detailsSection
-            templateSection
             invitesSection
         }
         .navigationTitle(event.title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") {
-                    showingEditSheet = true
+                Menu {
+                    Button {
+                        showingEditSheet = true
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+
+                    Button {
+                        duplicateEvent()
+                    } label: {
+                        Label("Duplicate", systemImage: "doc.on.doc")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -40,9 +55,31 @@ struct EventDetailView: View {
         }
     }
 
+    private var imageSection: some View {
+        Section("Invitation Card") {
+            if let imageData = event.imageData, let uiImage = UIImage(data: imageData) {
+                HStack {
+                    Spacer()
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 200)
+                        .cornerRadius(8)
+                    Spacer()
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+        }
+    }
+
     private var detailsSection: some View {
         Section("Details") {
             LabeledContent("Date", value: event.date, format: .dateTime)
+
+            if let expirationDate = event.expirationDate {
+                LabeledContent("Expires", value: expirationDate, format: .dateTime)
+            }
 
             if !event.subtitle.isEmpty {
                 LabeledContent("Subtitle", value: event.subtitle)
@@ -50,34 +87,6 @@ struct EventDetailView: View {
 
             if let address = event.address {
                 LabeledContent("Location", value: address)
-            }
-        }
-    }
-
-    private var templateSection: some View {
-        Section("Invitation Template") {
-            if let template = event.template {
-                HStack {
-                    if let uiImage = UIImage(data: template.imageData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 100)
-                            .cornerRadius(8)
-                    }
-
-                    VStack(alignment: .leading) {
-                        Text(template.name)
-                            .font(.headline)
-                        Text("QR Size: \(template.qrSize, format: .percent.precision(.fractionLength(0)))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                Button("Select Template") {
-                    // TODO: Template selection
-                }
             }
         }
     }
@@ -110,6 +119,13 @@ struct EventDetailView: View {
         for index in offsets {
             modelContext.delete(event.invites[index])
         }
+        try? modelContext.save()
+    }
+
+    private func duplicateEvent() {
+        let duplicate = event.duplicate()
+        modelContext.insert(duplicate)
+        try? modelContext.save()
     }
 }
 
