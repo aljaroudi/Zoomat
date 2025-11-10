@@ -18,7 +18,7 @@ struct CreateTemplateView: View {
     @State private var imageData: Data?
     @State private var qrPositionX: Double = 0.5
     @State private var qrPositionY: Double = 0.5
-    @State private var qrSize: Double = 100
+    @State private var qrSize: Double = 0.3
 
     var body: some View {
         NavigationStack {
@@ -67,18 +67,10 @@ struct CreateTemplateView: View {
                             Slider(value: $qrPositionY, in: 0...1)
                         }
 
-                        if let imageData, let uiImage = UIImage(data: imageData) {
-                            let minDimension = min(uiImage.size.width, uiImage.size.height)
-                            let percentage = qrSize / minDimension
-
-                            VStack(alignment: .leading) {
-                                Text("Size: \(percentage, format: .percent.precision(.fractionLength(0)))")
-                                    .font(.caption)
-                                Slider(value: Binding(
-                                    get: { percentage },
-                                    set: { qrSize = $0 * minDimension }
-                                ), in: 0.1...1.0)
-                            }
+                        VStack(alignment: .leading) {
+                            Text("Size: \(qrSize, format: .percent.precision(.fractionLength(0)))")
+                                .font(.caption)
+                            Slider(value: $qrSize, in: 0.1...1.0)
                         }
                     }
                 }
@@ -181,18 +173,10 @@ struct EditTemplateView: View {
                         Slider(value: $template.qrPositionY, in: 0...1)
                     }
 
-                    if let uiImage = UIImage(data: displayImageData) {
-                        let minDimension = min(uiImage.size.width, uiImage.size.height)
-                        let percentage = template.qrSize / minDimension
-
-                        VStack(alignment: .leading) {
-                            Text("Size: \(percentage, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: Binding(
-                                get: { percentage },
-                                set: { template.qrSize = $0 * minDimension }
-                            ), in: 0.1...1.0)
-                        }
+                    VStack(alignment: .leading) {
+                        Text("Size: \(template.qrSize, format: .percent.precision(.fractionLength(0)))")
+                            .font(.caption)
+                        Slider(value: $template.qrSize, in: 0.1...1.0)
                     }
                 }
 
@@ -243,7 +227,7 @@ struct EditTemplateView: View {
         imageData: UIImage(named: "MockTemplate")!.pngData()!,
         qrPositionX: 0.5,
         qrPositionY: 0.5,
-        qrSize: 100
+        qrSize: 0.3
     )
     container.mainContext.insert(template)
 

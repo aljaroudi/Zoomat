@@ -16,13 +16,18 @@ extension DataSchema.Invite {
         let renderer = UIGraphicsImageRenderer(size: templateImage.size)
 
         return renderer.image { context in
-
+            // Draw template background
             templateImage.draw(in: .zero)
 
-            let qrWidth = templateImage.size.width * template.qrSize
+            // Calculate QR size based on percentage of smallest dimension
+            let minDimension = min(templateImage.size.width, templateImage.size.height)
+            let qrWidth = minDimension * template.qrSize
+
+            // Calculate QR position (template uses normalized 0-1 coordinates)
             let qrX = templateImage.size.width * template.qrPositionX - qrWidth / 2
             let qrY = templateImage.size.height * template.qrPositionY - qrWidth / 2
 
+            // Draw QR code
             qrImage.draw(in: CGRect(x: qrX, y: qrY, width: qrWidth, height: qrWidth))
         }
     }
