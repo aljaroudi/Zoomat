@@ -11,7 +11,7 @@ import SwiftUI
 
 extension Invite {
     /// Generates a QR code image for this invite
-    func generateQRCode(size: CGSize = CGSize(width: 512, height: 512)) -> UIImage? {
+    private func generateQRCode(size: CGSize = CGSize(width: 512, height: 512)) -> UIImage? {
         let data = qrToken.data(using: .utf8)
 
         guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
@@ -36,40 +36,40 @@ extension Invite {
         return UIImage(cgImage: cgImage)
     }
 
-    /// Generates an invitation card by overlaying the QR code on the template
+    /// Generates an invitation card by overlaying the QR code on the event image
     func generateInvitationCard() -> UIImage? {
-        guard let template = event.template else {
-            // If no template, just return the QR code
+        guard let imageData = event.imageData,
+              let eventImage = UIImage(data: imageData) else {
+            // If no image, just return the QR code
             return generateQRCode()
         }
 
-        guard let templateImage = UIImage(data: template.imageData) else {
-            return nil
-        }
+        // Calculate QR size based on percentage of smallest dimension
+        let minDimension = min(eventImage.size.width, eventImage.size.height)
+        let qrWidth = minDimension * event.qrSize
+        let qrSize = CGSize(width: qrWidth, height: qrWidth)
 
-        // Generate QR code at the template's specified size
-        let qrSize = CGSize(width: template.qrSize, height: template.qrSize)
         guard let qrImage = generateQRCode(size: qrSize) else {
-            return templateImage
+            return eventImage
         }
 
-        // Create renderer with template size
-        let renderer = UIGraphicsImageRenderer(size: templateImage.size)
+        // Create renderer with event image size
+        let renderer = UIGraphicsImageRenderer(size: eventImage.size)
 
         return renderer.image { context in
-            // Draw template background
-            templateImage.draw(at: .zero)
+            // Draw event image background
+            eventImage.draw(at: .zero)
 
-            // Calculate QR position (template uses normalized 0-1 coordinates)
-            let qrX = templateImage.size.width * template.qrPositionX - template.qrSize / 2
-            let qrY = templateImage.size.height * template.qrPositionY - template.qrSize / 2
+            // Calculate QR position (event uses normalized 0-1 coordinates)
+            let qrX = eventImage.size.width * event.qrPositionX - qrWidth / 2
+            let qrY = eventImage.size.height * event.qrPositionY - qrWidth / 2
 
             // Draw QR code
             let qrRect = CGRect(
                 x: qrX,
                 y: qrY,
-                width: template.qrSize,
-                height: template.qrSize
+                width: qrWidth,
+                height: qrWidth
             )
             qrImage.draw(in: qrRect)
         }

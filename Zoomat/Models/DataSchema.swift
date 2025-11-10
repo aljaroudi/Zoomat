@@ -16,7 +16,6 @@ enum DataSchema: VersionedSchema {
         self.Contact.self,
         self.Event.self,
         self.Invite.self,
-        self.Template.self,
     ] }
 
     static var versionIdentifier = Schema.Version(1, 0, 0)
@@ -79,27 +78,36 @@ enum DataSchema: VersionedSchema {
         var subtitle: String
         // When
         var date: Date
+        var expirationDate: Date?
         // Where
         var address: String?
         var latitude: Double?
         var longitude: Double?
 
-        // Relationships
-        var template: Template?
+        // Invitation Card Design
+        @Attribute(.externalStorage) var imageData: Data?
+        var qrPositionX: Double
+        var qrPositionY: Double
+        var qrSize: Double
 
         @Relationship(deleteRule: .cascade, inverse: \Invite.event)
         var invites: [Invite]
 
-        init(title: String, subtitle: String = "", date: Date, address: String? = nil, location: CLLocation? = nil) {
+        init(title: String, subtitle: String = "", date: Date, expirationDate: Date? = nil, address: String? = nil, location: CLLocation? = nil, imageData: Data? = nil, qrPositionX: Double = 0.5, qrPositionY: Double = 0.5, qrSize: Double = 0.3) {
             self.id = .init()
             self.created = .init()
             self.updated = .init()
             self.title = title
             self.subtitle = subtitle
             self.date = date
+            self.expirationDate = expirationDate
             self.address = address
             self.latitude = location?.coordinate.latitude
             self.longitude = location?.coordinate.longitude
+            self.imageData = imageData
+            self.qrPositionX = qrPositionX
+            self.qrPositionY = qrPositionY
+            self.qrSize = qrSize
             self.invites = []
         }
 
@@ -113,6 +121,21 @@ enum DataSchema: VersionedSchema {
             let contact = Self.mock
             context.insert(contact)
             try? context.save()
+        }
+
+        func duplicate() -> Event {
+            Event(
+                title: "\(title) 2",
+                subtitle: subtitle,
+                date: date,
+                expirationDate: expirationDate,
+                address: address,
+                location: latitude != nil && longitude != nil ? CLLocation(latitude: latitude!, longitude: longitude!) : nil,
+                imageData: imageData,
+                qrPositionX: qrPositionX,
+                qrPositionY: qrPositionY,
+                qrSize: qrSize
+            )
         }
     }
 
@@ -151,65 +174,12 @@ enum DataSchema: VersionedSchema {
             try? context.save()
         }
     }
-
-    @Model
-    final class Template: Identifiable {
-        @Attribute(.unique) var id: UUID
-        var created: Date
-        var updated: Date
-
-        var name: String
-
-        @Attribute(.externalStorage) var imageData: Data
-
-        /// Horizontal position as a percentage
-        var qrPositionX: Double
-        /// Vertical position as a percentage
-        var qrPositionY: Double
-        /// Percentage of the smallest image dimension
-        var qrSize: Double
-
-        @Relationship(deleteRule: .nullify, inverse: \Event.template)
-        var events: [Event]
-
-        init(name: String, imageData: Data, qrPositionX: Double, qrPositionY: Double, qrSize: Double) {
-            self.id = .init()
-            self.created = .init()
-            self.updated = .init()
-            self.name = name
-            self.imageData = imageData
-            self.qrPositionX = qrPositionX
-            self.qrPositionY = qrPositionY
-            self.qrSize = qrSize
-            self.events = []
-        }
-
-        static var mock: Self {
-            .init(
-                name: "Default Template",
-                imageData: UIImage(named: "MockTemplate")!.jpegData(compressionQuality: 0.8)!,
-                qrPositionX: 0.5,
-                qrPositionY: 0.5,
-                qrSize: 0.3 // 30% of smallest dimension
-            )
-        }
-
-        static func loadMock(into context: ModelContext) {
-            let count = try? context.fetchCount(FetchDescriptor<Self>())
-            guard let count, count == 0 else { return }
-            let contact = Self.mock
-            context.insert(contact)
-            try? context.save()
-        }
-    }
-
 }
 
 typealias CheckIn = DataSchema.CheckIn
 typealias Contact = DataSchema.Contact
 typealias Event = DataSchema.Event
 typealias Invite = DataSchema.Invite
-typealias Template = DataSchema.Template
 
 // MARK: - Preview Data
 extension ModelContext {
