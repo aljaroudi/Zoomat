@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		151C5D222EC3B21700C132EF /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 151C5D212EC3B21700C132EF /* AppIcon.icon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		151C5C5B2EC0809000C132EF /* Zoomat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zoomat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		151C5D212EC3B21700C132EF /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -47,6 +52,7 @@
 			children = (
 				151C5C5D2EC0809000C132EF /* Zoomat */,
 				151C5C5C2EC0809000C132EF /* Products */,
+				151C5D212EC3B21700C132EF /* AppIcon.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,6 +128,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				151C5D222EC3B21700C132EF /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

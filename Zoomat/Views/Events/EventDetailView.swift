@@ -14,6 +14,7 @@ struct EventDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingAddInvites = false
     @State private var showingDuplicateAlert = false
+    @State private var showingCalendarEditor = false
 
     var body: some View {
         List {
@@ -35,6 +36,12 @@ struct EventDetailView: View {
                     }
 
                     Button {
+                        showingCalendarEditor = true
+                    } label: {
+                        Label("Add to Calendar", systemImage: "calendar.badge.plus")
+                    }
+
+                    Button {
                         duplicateEvent()
                     } label: {
                         Label("Duplicate", systemImage: "doc.on.doc")
@@ -49,6 +56,9 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showingAddInvites) {
             AddInvitesView(event: event)
+        }
+        .sheet(isPresented: $showingCalendarEditor) {
+            EventEditViewController(isPresented: $showingCalendarEditor, event: event)
         }
         .navigationDestination(for: Invite.self) { invite in
             InviteDetailView(invite: invite)
@@ -92,25 +102,44 @@ struct EventDetailView: View {
     }
 
     private var invitesSection: some View {
-        Section {
-            ForEach(event.invites) { invite in
-                NavigationLink(value: invite) {
-                    InviteRowView(invite: invite)
+        Group {
+            let notCheckedIn = event.invites.filter { $0.checkIns.isEmpty }
+            Section {
+                ForEach(notCheckedIn) { invite in
+                    NavigationLink(value: invite) {
+                        InviteRowView(invite: invite)
+                    }
+                }
+                .onDelete(perform: deleteInvites)
+
+                Button {
+                    showingAddInvites = true
+                } label: {
+                    Label("Add Invites", systemImage: "person.badge.plus")
+                }
+            } header: {
+                HStack {
+                    Text("Invites")
+                    Spacer()
+                    Text(notCheckedIn.count, format: .number)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .onDelete(perform: deleteInvites)
 
-            Button {
-                showingAddInvites = true
-            } label: {
-                Label("Add Invites", systemImage: "person.badge.plus")
-            }
-        } header: {
-            HStack {
-                Text("Invites")
-                Spacer()
-                Text("\(event.invites.count)")
-                    .foregroundStyle(.secondary)
+            let checkedIn = event.invites.filter { !$0.checkIns.isEmpty }
+            Section {
+                ForEach(checkedIn) { invite in
+                    NavigationLink(value: invite) {
+                        InviteRowView(invite: invite)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Checked In")
+                    Spacer()
+                    Text(checkedIn.count, format: .number)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -133,23 +162,14 @@ struct InviteRowView: View {
     let invite: Invite
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(invite.contact.name)
-                    .font(.headline)
+        VStack(alignment: .leading) {
+            Text(invite.contact.name)
+                .font(.headline)
 
-                if let email = invite.contact.email {
-                    Text(email)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            if !invite.checkIns.isEmpty {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+            if let contactInfo = invite.contact.phone ?? invite.contact.email {
+                Text(contactInfo)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

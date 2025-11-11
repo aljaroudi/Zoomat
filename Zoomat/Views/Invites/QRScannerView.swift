@@ -1,3 +1,10 @@
+//
+//  QRScannerView.swift
+//  Zoomat
+//
+//  Created by Mohammed on 11/9/25.
+//
+
 import SwiftUI
 import SwiftData
 import AVFoundation
@@ -5,8 +12,10 @@ import AVFoundation
 struct QRScannerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var allInvites: [Invite]
     @State private var scanner = QRScanner()
     @State var checkInStatus: CheckInStatus = .waiting
+    @State private var currentEventId: UUID?
 
     var body: some View {
         ZStack {
@@ -43,6 +52,19 @@ struct QRScannerView: View {
         }
     }
 
+    private var eventStats: (total: Int, checkedIn: Int, remaining: Int)? {
+        guard let eventId = currentEventId else {
+            return nil
+        }
+
+        let eventInvites = allInvites.filter { $0.event.id == eventId }
+        let total = eventInvites.count
+        let checkedIn = eventInvites.filter { !$0.checkIns.isEmpty }.count
+        let remaining = total - checkedIn
+
+        return (total, checkedIn, remaining)
+    }
+
     @ViewBuilder
     private var statusOverlay: some View {
         switch checkInStatus {
@@ -52,7 +74,7 @@ struct QRScannerView: View {
             successView(invite: invite)
         case .alreadyCheckedIn(let invite, _):
             alreadyCheckedInView(invite: invite)
-        case .failure(let reason):
+        case .failure(_):
             failureView()
         }
     }
@@ -60,6 +82,12 @@ struct QRScannerView: View {
     private var scanningView: some View {
         VStack(spacing: 16) {
             Spacer()
+
+            // Show stats if we have a current event
+            if let stats = eventStats {
+                statsBar(stats: stats)
+                    .padding(.bottom, 20)
+            }
 
             Image(systemName: "qrcode.viewfinder")
                 .font(.system(size: 60))
@@ -79,6 +107,12 @@ struct QRScannerView: View {
         VStack(spacing: 0) {
             Spacer()
                 .frame(height: 80)
+
+            // Show stats at top
+            if let stats = eventStats {
+                statsBar(stats: stats)
+                    .padding(.bottom, 20)
+            }
 
             // Contact name at top
             Text(invite.contact.name)
@@ -133,6 +167,12 @@ struct QRScannerView: View {
         VStack(spacing: 0) {
             Spacer()
                 .frame(height: 80)
+
+            // Show stats at top
+            if let stats = eventStats {
+                statsBar(stats: stats)
+                    .padding(.bottom, 20)
+            }
 
             // Contact name at top
             Text(invite.contact.name)
@@ -221,6 +261,34 @@ struct QRScannerView: View {
         .background(.red.opacity(0.6))
     }
 
+    @ViewBuilder
+    private func statsBar(stats: (total: Int, checkedIn: Int, remaining: Int)) -> some View {
+        HStack(spacing: 20) {
+            StatsBadge(
+                label: "Total",
+                value: stats.total,
+                color: .blue
+            )
+
+            StatsBadge(
+                label: "Checked In",
+                value: stats.checkedIn,
+                color: .green
+            )
+
+            StatsBadge(
+                label: "Remaining",
+                value: stats.remaining,
+                color: .orange
+            )
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
+    }
+
     private func handleScannedCode(_ code: String) {
         guard let uuid = UUID(uuidString: code) else {
             checkInStatus = .failure(reason: "QR code format is invalid")
@@ -236,6 +304,9 @@ struct QRScannerView: View {
             checkInStatus = .failure(reason: "Invite not found")
             return
         }
+
+        // Track current event for stats
+        currentEventId = invite.event.id
 
         // Check status BEFORE adding new check-in
         let hadPreviousCheckIns = !invite.checkIns.isEmpty
@@ -258,6 +329,25 @@ struct QRScannerView: View {
         } else {
             checkInStatus = .success(invite: invite)
         }
+    }
+}
+
+struct StatsBadge: View {
+    let label: LocalizedStringKey
+    let value: Int
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(value)")
+                .font(.title2.bold())
+                .foregroundStyle(color)
+
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -299,6 +389,7 @@ struct QRScannerCameraView: UIViewRepresentable {
 class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var isProcessing = false
     var onCodeScanned: ((String) -> Void)?
 
     func setupCamera(on view: UIView) {
@@ -336,6 +427,7 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     func startScanning() {
+        isProcessing = false
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession?.startRunning()
         }
@@ -350,13 +442,17 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         didOutput metadataObjects: [AVMetadataObject],
         from connection: AVCaptureConnection
     ) {
+        // Prevent duplicate scans
+        guard !isProcessing else { return }
+
         guard let metadataObject = metadataObjects.first,
               let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
               let stringValue = readableObject.stringValue else {
             return
         }
 
-        // Stop scanning to prevent multiple reads
+        // Mark as processing and stop scanning immediately
+        isProcessing = true
         stopScanning()
 
         // Notify delegate
