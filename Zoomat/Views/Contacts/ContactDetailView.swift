@@ -41,7 +41,7 @@ struct ContactDetailView: View {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(.green)
-                                    Text("Checked in")
+                                    Text("Checked In")
                                         .font(.caption2)
                                 }
                             }
@@ -105,7 +105,7 @@ struct CreateContactView: View {
                     .padding(.horizontal)
 
                 if !validNames.isEmpty {
-                    Text("^[\(validNames.count) contact](inflect: true) will be created")
+                    Text("^[\(validNames.count) contact](inflect: true)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)

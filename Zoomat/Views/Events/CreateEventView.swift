@@ -10,12 +10,12 @@ import SwiftData
 import PhotosUI
 
 enum EventDuration: String, CaseIterable, Identifiable {
-    case thirtyMinutes = "30 minutes"
-    case oneHour = "1 hour"
-    case twoHours = "2 hours"
-    case fourHours = "4 hours"
-    case oneDay = "1 day"
-    case custom = "Custom"
+    case thirtyMinutes
+    case oneHour
+    case twoHours
+    case fourHours
+    case oneDay
+    case custom
 
     var id: String { rawValue }
 
@@ -27,6 +27,17 @@ enum EventDuration: String, CaseIterable, Identifiable {
         case .fourHours: return 4 * 60 * 60
         case .oneDay: return 24 * 60 * 60
         case .custom: return nil
+        }
+    }
+
+    var displayText: LocalizedStringKey {
+        switch self {
+        case .thirtyMinutes: "^[\(30) minute](inflect: true)"
+        case .oneHour: "^[\(1) hour](inflect: true)"
+        case .twoHours: "^[\(2) hour](inflect: true)"
+        case .fourHours: "^[\(4) hour](inflect: true)"
+        case .oneDay: "^[\(1) day](inflect: true)"
+        case .custom: "Custom"
         }
     }
 }
@@ -65,7 +76,7 @@ struct CreateEventView: View {
                     if hasExpiration {
                         Picker("Duration", selection: $selectedDuration) {
                             ForEach(EventDuration.allCases) { duration in
-                                Text(duration.rawValue).tag(duration)
+                                Text(duration.displayText).tag(duration)
                             }
                         }
 
@@ -106,13 +117,13 @@ struct CreateEventView: View {
                         }
 
                         VStack(alignment: .leading) {
-                            Text("X Position: \(qrPositionX, format: .percent.precision(.fractionLength(0)))")
+                            Text("Horizontal Position: \(qrPositionX, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: $qrPositionX, in: 0...1)
                         }
 
                         VStack(alignment: .leading) {
-                            Text("Y Position: \(qrPositionY, format: .percent.precision(.fractionLength(0)))")
+                            Text("Vertical Position: \(qrPositionY, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: $qrPositionY, in: 0...1)
                         }
@@ -231,7 +242,7 @@ struct EditEventView: View {
                     if hasExpiration {
                         Picker("Duration", selection: $selectedDuration) {
                             ForEach(EventDuration.allCases) { duration in
-                                Text(duration.rawValue).tag(duration)
+                                Text(duration.displayText).tag(duration)
                             }
                         }
 
@@ -278,13 +289,13 @@ struct EditEventView: View {
                         }
 
                         VStack(alignment: .leading) {
-                            Text("X Position: \(event.qrPositionX, format: .percent.precision(.fractionLength(0)))")
+                            Text("Horizontal Position: \(event.qrPositionX, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: $event.qrPositionX, in: 0...1)
                         }
 
                         VStack(alignment: .leading) {
-                            Text("Y Position: \(event.qrPositionY, format: .percent.precision(.fractionLength(0)))")
+                            Text("Vertical Position: \(event.qrPositionY, format: .percent.precision(.fractionLength(0)))")
                                 .font(.caption)
                             Slider(value: $event.qrPositionY, in: 0...1)
                         }
