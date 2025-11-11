@@ -116,7 +116,7 @@ struct ContactRowView: View {
             }
 
             if !contact.invites.isEmpty {
-                Text("\(contact.invites.count) invite\(contact.invites.count == 1 ? "" : "s")")
+                Text("^[\(contact.invites.count) invite](inflect: true)")
                     .font(.caption2)
                     .foregroundStyle(.blue)
             }

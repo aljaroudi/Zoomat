@@ -133,12 +133,6 @@ struct QRScannerView: View {
                     .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
-
-                if invite.checkIns.count > 1 {
-                    Text("Check-in #\(invite.checkIns.count, format: .number)")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.8))
-                }
             }
 
             Spacer()
@@ -339,7 +333,7 @@ struct StatsBadge: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text("\(value)")
+            Text(value, format: .number)
                 .font(.title2.bold())
                 .foregroundStyle(color)
 

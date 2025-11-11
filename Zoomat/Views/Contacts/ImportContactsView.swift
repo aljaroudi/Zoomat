@@ -35,8 +35,7 @@ struct ImportContactsView: View {
                 } else if deviceContacts.isEmpty {
                     ContentUnavailableView(
                         "No Contacts Found",
-                        systemImage: "person.crop.circle",
-                        description: Text("No contacts available to import")
+                        systemImage: "person.crop.circle"
                     )
                 } else {
                     contactsList
