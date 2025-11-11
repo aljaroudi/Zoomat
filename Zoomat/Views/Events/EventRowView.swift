@@ -11,25 +11,10 @@ struct EventRowView: View {
     let event: Event
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(event.title)
-                .font(.headline)
 
-            Text(event.subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Label(event.date.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
-
-                if let address = event.address {
-                    Label(address, systemImage: "location")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-            HStack {
+            HStack(spacing: 10) {
                 Label {
                     Text(event.invites.count, format: .number)
                 } icon: {

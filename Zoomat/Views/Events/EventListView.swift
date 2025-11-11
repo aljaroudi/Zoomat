@@ -13,6 +13,10 @@ struct EventListView: View {
     @Query(sort: \Event.date, order: .reverse) private var events: [Event]
     @State private var showingCreateEvent = false
 
+    var groupedEvents: [String : [Event]] {
+        Dictionary(grouping: events, by: \.relativeDate)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -46,23 +50,43 @@ struct EventListView: View {
         )
     }
 
+    private var sortedHeaders: [String] {
+        // Map headers to their earliest event date for proper sorting
+        let headerDates = Dictionary(uniqueKeysWithValues:
+                                        groupedEvents.map { header, events in
+            (header, events.map(\.date).max() ?? .distantPast)
+        }
+        )
+
+        return headerDates.sorted { $0.value > $1.value }.map { $0.key }
+    }
+
+
     private var eventList: some View {
         List {
-            ForEach(events) { event in
-                NavigationLink(value: event) {
-                    EventRowView(event: event)
+            ForEach(sortedHeaders, id: \.self) { date in
+                Section(date.localizedCapitalized) {
+                    ForEach(groupedEvents[date] ?? []) { event in
+                        NavigationLink(value: event) {
+                            EventRowView(event: event)
+                        }
+                    }
+                    .onDelete { offsets in
+                        deleteEvents(at: offsets, for: date)
+                    }
                 }
             }
-            .onDelete(perform: deleteEvents)
         }
+        .listStyle(.grouped)
         .navigationDestination(for: Event.self) { event in
             EventDetailView(event: event)
         }
     }
 
-    private func deleteEvents(at offsets: IndexSet) {
+    private func deleteEvents(at offsets: IndexSet, for date: String) {
+        let eventsForDate = groupedEvents[date] ?? []
         for index in offsets {
-            modelContext.delete(events[index])
+            modelContext.delete(eventsForDate[index])
         }
     }
 }

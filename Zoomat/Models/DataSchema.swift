@@ -137,6 +137,10 @@ enum DataSchema: VersionedSchema {
                 qrSize: qrSize
             )
         }
+
+        var relativeDate: String {
+            Calendar.current.startOfDay(for: self.date).formatted(.relative(presentation: .named))
+        }
     }
 
     @Model

@@ -52,7 +52,7 @@ struct ContactDetailView: View {
                 HStack {
                     Text("Events")
                     Spacer()
-                    Text("\(contact.invites.count)")
+                    Text(contact.invites.count, format: .number)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -79,25 +79,41 @@ struct CreateContactView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name = ""
-    @State private var email = ""
-    @State private var phone = ""
+    @State private var namesText = ""
+
+    private var validNames: [String] {
+        namesText
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Contact Information") {
-                    TextField("Name", text: $name)
-                    TextField("Email (optional)", text: $email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                    TextField("Phone (optional)", text: $phone)
-                        .textContentType(.telephoneNumber)
-                        .keyboardType(.phonePad)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Enter names (one per line)")
+                    .font(.headline)
+                    .padding(.horizontal)
+                    .padding(.top)
+
+                TextEditor(text: $namesText)
+                    .font(.body)
+                    .autocapitalization(.words)
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal)
+
+                if !validNames.isEmpty {
+                    Text("^[\(validNames.count) contact](inflect: true) will be created")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
                 }
+
+                Spacer()
             }
-            .navigationTitle("New Contact")
+            .navigationTitle("New Contacts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -108,22 +124,19 @@ struct CreateContactView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        createContact()
+                        createContacts()
                     }
-                    .disabled(name.isEmpty)
+                    .disabled(validNames.isEmpty)
                 }
             }
         }
     }
 
-    private func createContact() {
-        let contact = Contact(
-            name: name,
-            phone: phone.isEmpty ? nil : phone,
-            email: email.isEmpty ? nil : email
-        )
-
-        modelContext.insert(contact)
+    private func createContacts() {
+        for name in validNames {
+            let contact = Contact(name: name)
+            modelContext.insert(contact)
+        }
         dismiss()
     }
 }
