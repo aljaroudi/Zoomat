@@ -14,47 +14,34 @@ struct InviteDetailView: View {
     @State private var showingShareSheet = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Invitation Card Preview
-                if let card = generatedCard {
-                    Image(uiImage: card)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(radius: 10)
-                } else {
-                    ProgressView("Generating invitation...")
-                        .frame(height: 400)
-                }
+        VStack(spacing: 0) {
+            // Invitation Card Preview
+            if let card = generatedCard {
+                Image(uiImage: card)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(radius: 10)
+                    .padding()
+            } else {
+                ProgressView("Generating invitation...")
+                    .frame(height: 400)
+                    .padding()
+            }
 
+            Form {
                 // Guest Info
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Guest Information")
-                        .font(.headline)
-
-                    LabeledContent("Name", value: invite.contact.name)
-
-                    if let email = invite.contact.email {
-                        LabeledContent("Email", value: email)
-                    }
-
-                    if let phone = invite.contact.phone {
-                        LabeledContent("Phone", value: phone)
+                Section("Guest") {
+                    NavigationLink {
+                        ContactDetailView(contact: invite.contact)
+                    } label: {
+                        Label(invite.contact.name, systemImage: "person.fill")
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 // Event Info
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Event")
-                        .font(.headline)
-
+                Section("Event") {
                     Text(invite.event.title)
-                        .font(.title2)
 
                     if !invite.event.subtitle.isEmpty {
                         Text(invite.event.subtitle)
@@ -70,16 +57,8 @@ struct InviteDetailView: View {
                         Label(address, systemImage: "location")
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
 
-                // Check-In Status
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Check-In Status")
-                        .font(.headline)
-
+                Section("Status") {
                     if invite.checkIns.isEmpty {
                         Label("Not checked in", systemImage: "circle")
                             .foregroundStyle(.secondary)
@@ -93,27 +72,21 @@ struct InviteDetailView: View {
                         }
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                // Share Button
-                if let _ = generatedCard {
-                    Button {
-                        showingShareSheet = true
-                    } label: {
-                        Label("Share Invitation", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                }
             }
-            .padding()
         }
         .navigationTitle("Invitation")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if generatedCard != nil {
+                    Button {
+                        showingShareSheet = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+            }
+        }
         .task {
             generateCard()
         }
