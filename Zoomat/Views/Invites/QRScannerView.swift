@@ -422,9 +422,7 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
 
     func startScanning() {
         isProcessing = false
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession?.startRunning()
-        }
+        captureSession?.startRunning()
     }
 
     func stopScanning() {

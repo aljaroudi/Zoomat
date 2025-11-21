@@ -87,8 +87,9 @@ struct CreateEventView: View {
                 }
 
                 Section("Invitation Card") {
+                    let currentImageData = imageData
                     PhotosPicker(selection: $selectedImage, matching: .images) {
-                        if let imageData, let uiImage = UIImage(data: imageData) {
+                        if let currentImageData, let uiImage = UIImage(data: currentImageData) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFit()
@@ -253,8 +254,9 @@ struct EditEventView: View {
                 }
 
                 Section("Invitation Card") {
+                    let currentDisplayImageData = displayImageData
                     PhotosPicker(selection: $selectedImage, matching: .images) {
-                        if let displayImageData, let uiImage = UIImage(data: displayImageData) {
+                        if let currentDisplayImageData, let uiImage = UIImage(data: currentDisplayImageData) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFit()

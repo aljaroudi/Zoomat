@@ -98,11 +98,13 @@ struct InviteDetailView: View {
     }
 
     private func generateCard() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let card = invite.generateInvitationCard()
-            DispatchQueue.main.async {
-                generatedCard = card
-            }
+        Task {
+            let card = await Task.detached {
+                await MainActor.run {
+                    invite.generateInvitationCard()
+                }
+            }.value
+            generatedCard = card
         }
     }
 }

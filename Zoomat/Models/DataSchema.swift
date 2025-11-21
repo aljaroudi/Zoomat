@@ -18,7 +18,7 @@ enum DataSchema: VersionedSchema {
         self.Invite.self,
     ] }
 
-    static var versionIdentifier = Schema.Version(1, 0, 0)
+    static let versionIdentifier = Schema.Version(1, 0, 0)
 
     @Model
     final class CheckIn: Identifiable {
