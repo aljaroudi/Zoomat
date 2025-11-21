@@ -15,6 +15,7 @@ struct EventDetailView: View {
     @State private var showingAddInvites = false
     @State private var showingDuplicateAlert = false
     @State private var showingCalendarEditor = false
+    @State private var showingExportInvitations = false
 
     var body: some View {
         List {
@@ -34,6 +35,13 @@ struct EventDetailView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
+
+                    Button {
+                        showingExportInvitations = true
+                    } label: {
+                        Label("Export All Invitations", systemImage: "square.and.arrow.up.on.square")
+                    }
+                    .disabled(event.invites.isEmpty)
 
                     Button {
                         showingCalendarEditor = true
@@ -56,6 +64,9 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showingAddInvites) {
             AddInvitesView(event: event)
+        }
+        .sheet(isPresented: $showingExportInvitations) {
+            ExportInvitationsView(event: event)
         }
         .sheet(isPresented: $showingCalendarEditor) {
             EventEditViewController(isPresented: $showingCalendarEditor, event: event)
@@ -162,14 +173,42 @@ struct InviteRowView: View {
     let invite: Invite
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(invite.contact.name)
-                .font(.headline)
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(invite.displayName)
+                    .font(.headline)
 
-            if let contactInfo = invite.contact.phone ?? invite.contact.email {
-                Text(contactInfo)
+                if let contact = invite.contact {
+                    if let contactInfo = contact.phone ?? contact.email {
+                        Text(contactInfo)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("General admission")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Show check-in limit badge if set
+                if let maxCheckIns = invite.maxCheckIns {
+                    HStack(spacing: 4) {
+                        Image(systemName: "number")
+                            .font(.caption2)
+                        Text("\(invite.checkIns.count)/\(maxCheckIns) check-ins")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(invite.hasReachedLimit ? .red : .blue)
+                }
+            }
+
+            Spacer()
+
+            // Show limit reached indicator
+            if invite.hasReachedLimit {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }

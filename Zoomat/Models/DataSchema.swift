@@ -18,7 +18,7 @@ enum DataSchema: VersionedSchema {
         self.Invite.self,
     ] }
 
-    static let versionIdentifier = Schema.Version(1, 0, 0)
+    static let versionIdentifier = Schema.Version(2, 0, 0)
 
     @Model
     final class CheckIn: Identifiable {
@@ -43,7 +43,6 @@ enum DataSchema: VersionedSchema {
         var phone: String?
         var email: String?
 
-        @Relationship(deleteRule: .cascade, inverse: \Invite.contact)
         var invites: [Invite]
 
         init(name: String, phone: String? = nil, email: String? = nil) {
@@ -147,23 +146,36 @@ enum DataSchema: VersionedSchema {
     final class Invite: Identifiable {
         @Attribute(.unique) var id: UUID
         var created: Date
-        // Who
-        var contact: Contact
+
+        // Who (now optional - backwards compatible)
+        var contact: Contact?
+        var contactName: String? // Store name when no contact is linked
 
         @Relationship(deleteRule: .cascade, inverse: \CheckIn.invite)
         var checkIns: [CheckIn]
 
         // What
         var event: Event
+
+        // Check-in limits (nil = unlimited - backwards compatible)
+        var maxCheckIns: Int?
+
         // How
         var qrToken: String { id.uuidString }
 
-        init(contact: Contact, event: Event) {
+        init(contact: Contact?, event: Event, contactName: String? = nil, maxCheckIns: Int? = nil) {
             self.id = .init()
             self.created = .init()
             self.contact = contact
+            self.contactName = contactName ?? contact?.name
             self.checkIns = []
             self.event = event
+            self.maxCheckIns = maxCheckIns
+        }
+
+        // Convenience initializer for backwards compatibility
+        convenience init(contact: Contact, event: Event) {
+            self.init(contact: contact, event: event, contactName: nil, maxCheckIns: nil)
         }
 
         static var mock: Self {
@@ -177,9 +189,19 @@ enum DataSchema: VersionedSchema {
             context.insert(contact)
             try? context.save()
         }
+
+        var displayName: String {
+            contactName ?? "General Invite"
+        }
+
+        var hasReachedLimit: Bool {
+            guard let maxCheckIns else { return false }
+            return checkIns.count >= maxCheckIns
+        }
     }
 }
 
+// MARK: - Type Aliases
 typealias CheckIn = DataSchema.CheckIn
 typealias Contact = DataSchema.Contact
 typealias Event = DataSchema.Event

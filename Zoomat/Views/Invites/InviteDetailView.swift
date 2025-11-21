@@ -32,10 +32,15 @@ struct InviteDetailView: View {
             Form {
                 // Guest Info
                 Section("Guest") {
-                    NavigationLink {
-                        ContactDetailView(contact: invite.contact)
-                    } label: {
-                        Label(invite.contact.name, systemImage: "person.fill")
+                    if let contact = invite.contact {
+                        NavigationLink {
+                            ContactDetailView(contact: contact)
+                        } label: {
+                            Label(contact.name, systemImage: "person.fill")
+                        }
+                    } else {
+                        Label(invite.displayName, systemImage: "ticket")
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -55,6 +60,23 @@ struct InviteDetailView: View {
 
                     if let address = invite.event.address {
                         Label(address, systemImage: "location")
+                    }
+                }
+
+                // Check-in Limit (if set)
+                if let maxCheckIns = invite.maxCheckIns {
+                    Section("Check-in Limit") {
+                        HStack {
+                            Text("Progress")
+                            Spacer()
+                            Text("\(invite.checkIns.count) / \(maxCheckIns)")
+                                .foregroundStyle(invite.hasReachedLimit ? .red : .secondary)
+                        }
+
+                        if invite.hasReachedLimit {
+                            Label("Maximum reached", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
 

@@ -8,6 +8,8 @@
 import UIKit
 import CoreImage
 import SwiftUI
+import ImageIO
+import UniformTypeIdentifiers
 
 extension Invite {
     /// Generates a QR code image for this invite
@@ -73,5 +75,44 @@ extension Invite {
             )
             qrImage.draw(in: qrRect)
         }
+    }
+
+    /// Generates an invitation card with embedded metadata (readable in iOS Photos app)
+    func generateInvitationCardWithMetadata() -> Data? {
+        guard let image = generateInvitationCard(),
+              let cgImage = image.cgImage else {
+            return nil
+        }
+
+        // Create metadata dictionary
+        let metadata: [String: Any] = [
+            kCGImagePropertyIPTCDictionary as String: [
+                kCGImagePropertyIPTCCaptionAbstract as String: displayName,
+                kCGImagePropertyIPTCKeywords as String: [event.title, "Zoomat Invitation"],
+                kCGImagePropertyIPTCCreatorContactInfo as String: "Zoomat"
+            ],
+            kCGImagePropertyExifDictionary as String: [
+                kCGImagePropertyExifUserComment as String: "Invitation for \(displayName) - \(event.title)"
+            ]
+        ]
+
+        // Create image data with metadata
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            mutableData,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+
+        CGImageDestinationAddImage(destination, cgImage, metadata as CFDictionary)
+
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+
+        return mutableData as Data
     }
 }
