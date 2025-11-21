@@ -74,6 +74,8 @@ struct QRScannerView: View {
             successView(invite: invite)
         case .alreadyCheckedIn(let invite, _):
             alreadyCheckedInView(invite: invite)
+        case .maxReached(let invite):
+            maxReachedView(invite: invite)
         case .failure(_):
             failureView()
         }
@@ -115,7 +117,7 @@ struct QRScannerView: View {
             }
 
             // Contact name at top
-            Text(invite.contact.name)
+            Text(invite.displayName)
                 .font(.system(size: 48, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 32)
@@ -169,7 +171,7 @@ struct QRScannerView: View {
             }
 
             // Contact name at top
-            Text(invite.contact.name)
+            Text(invite.displayName)
                 .font(.system(size: 48, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 32)
@@ -216,6 +218,64 @@ struct QRScannerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.thinMaterial)
         .background(.orange.opacity(0.6))
+    }
+
+    private func maxReachedView(invite: Invite) -> some View {
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: 80)
+
+            // Show stats at top
+            if let stats = eventStats {
+                statsBar(stats: stats)
+                    .padding(.bottom, 20)
+            }
+
+            // Contact name at top
+            Text(invite.displayName)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 32)
+
+            Spacer()
+
+            // Center content
+            VStack(spacing: 20) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.white)
+
+                Text("Maximum Reached")
+                    .font(.title2)
+                    .foregroundStyle(.white.opacity(0.95))
+
+                if let maxCheckIns = invite.maxCheckIns {
+                    Text("^[\(maxCheckIns) check-in](inflect: true) allowed")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+            }
+
+            Spacer()
+
+            // Button at bottom
+            Button {
+                checkInStatus = .waiting
+            } label: {
+                Text("Continue Scanning")
+                    .font(.headline)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 60)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.thinMaterial)
+        .background(.red.opacity(0.6))
     }
 
     private func failureView() -> some View {
@@ -302,11 +362,21 @@ struct QRScannerView: View {
         // Track current event for stats
         currentEventId = invite.event.id
 
+        // Check if max limit already reached BEFORE adding new check-in
+        if invite.hasReachedLimit {
+            // Haptic feedback for error
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+
+            checkInStatus = .maxReached(invite: invite)
+            return
+        }
+
         // Check status BEFORE adding new check-in
         let hadPreviousCheckIns = !invite.checkIns.isEmpty
         let previousCheckInCount = invite.checkIns.count
 
-        // Create check-in (allow multiple check-ins)
+        // Create check-in (allow multiple check-ins up to limit)
         let checkIn = CheckIn(invite: invite)
         modelContext.insert(checkIn)
 
@@ -349,6 +419,7 @@ enum CheckInStatus: Equatable {
     case waiting
     case success(invite: Invite)
     case alreadyCheckedIn(invite: Invite, previousCount: Int)
+    case maxReached(invite: Invite)
     case failure(reason: String)
 }
 
@@ -422,9 +493,7 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
 
     func startScanning() {
         isProcessing = false
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession?.startRunning()
-        }
+        captureSession?.startRunning()
     }
 
     func stopScanning() {

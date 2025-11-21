@@ -6,5 +6,7 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Zoomat needs access to save invitation cards to your photo library.</string>
 </dict>
 </plist>

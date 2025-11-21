@@ -87,8 +87,9 @@ struct CreateEventView: View {
                 }
 
                 Section("Invitation Card") {
+                    let currentImageData = imageData
                     PhotosPicker(selection: $selectedImage, matching: .images) {
-                        if let imageData, let uiImage = UIImage(data: imageData) {
+                        if let currentImageData, let uiImage = UIImage(data: currentImageData) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFit()
@@ -196,14 +197,14 @@ struct EditEventView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @Bindable var event: DataSchema.Event
+    @Bindable var event: Event
     @State private var selectedImage: PhotosPickerItem?
     @State private var newImageData: Data?
     @State private var hasExpiration: Bool
     @State private var selectedDuration: EventDuration = .oneHour
     @State private var customExpirationDate: Date
 
-    init(event: DataSchema.Event) {
+    init(event: Event) {
         self.event = event
         _hasExpiration = State(initialValue: event.expirationDate != nil)
         _customExpirationDate = State(initialValue: event.expirationDate ?? Date())
@@ -253,8 +254,9 @@ struct EditEventView: View {
                 }
 
                 Section("Invitation Card") {
+                    let currentDisplayImageData = displayImageData
                     PhotosPicker(selection: $selectedImage, matching: .images) {
-                        if let displayImageData, let uiImage = UIImage(data: displayImageData) {
+                        if let currentDisplayImageData, let uiImage = UIImage(data: currentDisplayImageData) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFit()
