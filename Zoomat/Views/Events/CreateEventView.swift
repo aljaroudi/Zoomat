@@ -13,6 +13,7 @@ struct EventDraft {
     var date = Date()
     var duration: TimeInterval = 3_600
     var address = ""
+    var defaultAdditionalGuestCount = 0
     var imageData: Data?
     var qrPositionX = 0.5
     var qrPositionY = 0.5
@@ -26,6 +27,7 @@ struct EventDraft {
         date = event.date
         duration = max(event.effectiveExpirationDate.timeIntervalSince(event.date), 900)
         address = event.address ?? ""
+        defaultAdditionalGuestCount = event.defaultAdditionalGuestCount
         imageData = event.imageData
         qrPositionX = event.qrPositionX
         qrPositionY = event.qrPositionY
@@ -49,6 +51,7 @@ struct EventDraft {
         event.date = date
         event.expirationDate = expirationDate
         event.address = address.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        event.defaultAdditionalGuestCount = defaultAdditionalGuestCount
         event.imageData = imageData
         event.qrPositionX = qrPositionX
         event.qrPositionY = qrPositionY
@@ -204,6 +207,20 @@ private struct EventForm<Footer: View>: View {
                     )
                 }
                 LabeledContent("Expires", value: draft.expirationDate, format: .dateTime)
+            }
+
+            Section {
+                Stepper(value: $draft.defaultAdditionalGuestCount, in: 0...10) {
+                    LabeledContent(
+                        "Additional Guests",
+                        value: draft.defaultAdditionalGuestCount,
+                        format: .number
+                    )
+                }
+            } header: {
+                Text("Guest Allowance")
+            } footer: {
+                Text("Shown during check-in for named invitations. Individual invitations can override this value.")
             }
 
             Section("Invitation Card") {

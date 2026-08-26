@@ -55,7 +55,7 @@ struct ImportContactsView: View {
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Import (\(selectedContacts.count))") {
+                    Button("Import (\(selectedContacts.count, format: .number))") {
                         importSelectedContacts()
                     }
                     .disabled(selectedContacts.isEmpty)

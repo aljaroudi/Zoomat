@@ -25,11 +25,16 @@ struct AddInvitesView: View {
     @State private var searchText = ""
     @State private var errorMessage: String?
     @State private var showingCreateContact = false
+    @State private var usesEventDefault = true
+    @State private var customAdditionalGuestCount: Int
 
     // Blank invite settings
     @State private var blankInviteQuantity = 1
-    @State private var blankInviteMaxCheckIns: Int? = 1
-    @State private var hasMaxCheckIns = true
+
+    init(event: Event) {
+        self.event = event
+        _customAdditionalGuestCount = State(initialValue: event.defaultAdditionalGuestCount)
+    }
 
     var filteredContacts: [Contact] {
         // Filter out contacts already invited
@@ -90,9 +95,9 @@ struct AddInvitesView: View {
     private var confirmButtonLabel: some View {
         switch mode {
         case .fromContacts:
-            Text("Add (\(selectedContactIDs.count))")
+            Text("Add (\(selectedContactIDs.count, format: .number))")
         case .blank:
-            Text("Create (\(blankInviteQuantity))")
+            Text("Create (\(blankInviteQuantity, format: .number))")
         }
     }
 
@@ -121,26 +126,13 @@ struct AddInvitesView: View {
     private var blankModeContent: some View {
         Form {
             Section {
-                Stepper("^[\(blankInviteQuantity) card](inflect: true)", value: $blankInviteQuantity, in: 1...100)
+                Stepper(value: $blankInviteQuantity, in: 1...100) {
+                    Text(blankInviteQuantityText)
+                }
             } header: {
                 Text("Quantity")
             } footer: {
                 Text("The number of different invitation cards to create.")
-            }
-
-            Section {
-                Toggle("Set maximum check-ins", isOn: $hasMaxCheckIns)
-
-                if hasMaxCheckIns {
-                    Stepper("Maximum: \(blankInviteMaxCheckIns ?? 1)", value: Binding(
-                        get: { blankInviteMaxCheckIns ?? 1 },
-                        set: { blankInviteMaxCheckIns = $0 }
-                    ), in: 1...100)
-                }
-            } header: {
-                Text("Check-in Limit")
-            } footer: {
-                Text("Blank invites are not linked to any contact and can be used for general admission.")
             }
         }
     }
@@ -162,22 +154,48 @@ struct AddInvitesView: View {
 
     private var contactList: some View {
         List {
-            ForEach(filteredContacts) { contact in
-                Button {
-                    if selectedContactIDs.contains(contact.id) {
-                        selectedContactIDs.remove(contact.id)
-                    } else {
-                        selectedContactIDs.insert(contact.id)
-                    }
-                } label: {
-                    ContactSelectionRow(
-                        contact: contact,
-                        isSelected: selectedContactIDs.contains(contact.id)
+            Section {
+                Toggle("Use Event Default", isOn: $usesEventDefault)
+
+                if usesEventDefault {
+                    LabeledContent(
+                        "Additional Guests",
+                        value: event.defaultAdditionalGuestCount,
+                        format: .number
                     )
+                } else {
+                    Stepper(value: $customAdditionalGuestCount, in: 0...10) {
+                        LabeledContent(
+                            "Additional Guests",
+                            value: customAdditionalGuestCount,
+                            format: .number
+                        )
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Double-tap to select or deselect this contact")
-                .accessibilityAddTraits(selectedContactIDs.contains(contact.id) ? .isSelected : [])
+            } header: {
+                Text("Guest Allowance")
+            } footer: {
+                Text("This setting applies to every contact selected below. You can customize an invitation later.")
+            }
+
+            Section("Contacts") {
+                ForEach(filteredContacts) { contact in
+                    Button {
+                        if selectedContactIDs.contains(contact.id) {
+                            selectedContactIDs.remove(contact.id)
+                        } else {
+                            selectedContactIDs.insert(contact.id)
+                        }
+                    } label: {
+                        ContactSelectionRow(
+                            contact: contact,
+                            isSelected: selectedContactIDs.contains(contact.id)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Double-tap to select or deselect this contact")
+                    .accessibilityAddTraits(selectedContactIDs.contains(contact.id) ? .isSelected : [])
+                }
             }
         }
     }
@@ -189,17 +207,20 @@ struct AddInvitesView: View {
                 guard let contact = contacts.first(where: { $0.id == contactID }) else {
                     continue
                 }
-                let invite = Invite(contact: contact, event: event)
+                let invite = Invite(
+                    contact: contact,
+                    event: event,
+                    additionalGuestCountOverride: usesEventDefault ? nil : customAdditionalGuestCount
+                )
                 modelContext.insert(invite)
             }
         case .blank:
-            let maxCheckIns = hasMaxCheckIns ? blankInviteMaxCheckIns : nil
             for i in 1...blankInviteQuantity {
+                let inviteNumber = event.invites.count + i
                 let invite = Invite(
                     contact: nil,
                     event: event,
-                    contactName: "General Invite #\(event.invites.count + i)",
-                    maxCheckIns: maxCheckIns
+                    contactName: String(localized: "General Invite #\(inviteNumber, format: .number)")
                 )
                 modelContext.insert(invite)
             }
@@ -211,6 +232,14 @@ struct AddInvitesView: View {
         } catch {
             modelContext.rollback()
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private var blankInviteQuantityText: LocalizedStringResource {
+        if blankInviteQuantity == 1 {
+            "\(blankInviteQuantity, format: .number) card"
+        } else {
+            "\(blankInviteQuantity, format: .number) cards"
         }
     }
 }

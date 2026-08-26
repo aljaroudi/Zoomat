@@ -63,8 +63,8 @@ struct EventRowView: View {
             }
 
             HStack(spacing: 16) {
-                Label("^[\(event.invites.count) invitation](inflect: true)", systemImage: "person.2")
-                Label("^[\(checkInCount) check-in](inflect: true)", systemImage: "checkmark.circle")
+                Label(invitationCountText, systemImage: "person.2")
+                Label(checkInCountText, systemImage: "checkmark.circle")
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -75,6 +75,22 @@ struct EventRowView: View {
 
     private var checkInCount: Int {
         event.invites.reduce(0) { $0 + $1.checkIns.count }
+    }
+
+    private var invitationCountText: LocalizedStringResource {
+        if event.invites.count == 1 {
+            "\(event.invites.count, format: .number) invitation"
+        } else {
+            "\(event.invites.count, format: .number) invitations"
+        }
+    }
+
+    private var checkInCountText: LocalizedStringResource {
+        if checkInCount == 1 {
+            "\(checkInCount, format: .number) check-in"
+        } else {
+            "\(checkInCount, format: .number) check-ins"
+        }
     }
 }
 

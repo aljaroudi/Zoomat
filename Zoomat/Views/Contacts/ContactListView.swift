@@ -149,13 +149,21 @@ struct ContactRowView: View {
             }
 
             if !contact.invites.isEmpty {
-                Label("^[\(contact.invites.count) invite](inflect: true)", systemImage: "ticket")
+                Label(inviteCountText, systemImage: "ticket")
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
+    }
+
+    private var inviteCountText: LocalizedStringResource {
+        if contact.invites.count == 1 {
+            "\(contact.invites.count, format: .number) invite"
+        } else {
+            "\(contact.invites.count, format: .number) invites"
+        }
     }
 }
 

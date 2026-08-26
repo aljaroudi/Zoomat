@@ -74,6 +74,7 @@ final class ZoomatCleanupTests: XCTestCase {
 
         XCTAssertEqual(draft.duration, 3_600)
         XCTAssertEqual(draft.expirationDate, start.addingTimeInterval(3_600))
+        XCTAssertEqual(draft.defaultAdditionalGuestCount, 0)
     }
 
     @MainActor
@@ -99,29 +100,35 @@ final class ZoomatCleanupTests: XCTestCase {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let event = Event(title: "Event", date: .now)
-        let invite = Invite(contact: nil, event: event, maxCheckIns: nil)
+        let invite = Invite(contact: nil, event: event)
         context.insert(event)
         context.insert(invite)
         try context.save()
 
-        XCTAssertEqual(try invite.recordCheckIn(in: context), .recorded(count: 1))
-        XCTAssertEqual(try invite.recordCheckIn(in: context), .recorded(count: 2))
+        XCTAssertEqual(try invite.recordCheckIn(in: context), 1)
+        XCTAssertEqual(try invite.recordCheckIn(in: context), 2)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 2)
     }
 
     @MainActor
-    func testMaximumCheckInsStopsAdditionalRecord() throws {
-        let container = try makeInMemoryContainer()
-        let context = container.mainContext
-        let event = Event(title: "Event", date: .now)
-        let invite = Invite(contact: nil, event: event, maxCheckIns: 1)
-        context.insert(event)
-        context.insert(invite)
-        try context.save()
+    func testNamedInviteInheritsEventGuestAllowanceUntilOverridden() {
+        let contact = Contact(name: "Guest")
+        let event = Event(title: "Event", date: .now, defaultAdditionalGuestCount: 2)
+        let invite = Invite(contact: contact, event: event)
+        let blankInvite = Invite(contact: nil, event: event)
 
-        XCTAssertEqual(try invite.recordCheckIn(in: context), .recorded(count: 1))
-        XCTAssertEqual(try invite.recordCheckIn(in: context), .maximumReached)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 1)
+        XCTAssertEqual(invite.effectiveAdditionalGuestCount, 2)
+        XCTAssertNil(blankInvite.effectiveAdditionalGuestCount)
+
+        event.defaultAdditionalGuestCount = 3
+        XCTAssertEqual(invite.effectiveAdditionalGuestCount, 3)
+
+        invite.additionalGuestCountOverride = 1
+        event.defaultAdditionalGuestCount = 4
+        XCTAssertEqual(invite.effectiveAdditionalGuestCount, 1)
+
+        invite.additionalGuestCountOverride = nil
+        XCTAssertEqual(invite.effectiveAdditionalGuestCount, 4)
     }
 
     func testQRRectStaysInsideImageBounds() {
@@ -213,9 +220,10 @@ final class ZoomatCleanupTests: XCTestCase {
             let event = Event(
                 title: "Legacy Event",
                 date: .now,
-                expirationDate: Date.distantPast
+                expirationDate: Date.distantPast,
+                defaultAdditionalGuestCount: 2
             )
-            let invite = Invite(contact: contact, event: event)
+            let invite = Invite(contact: contact, event: event, additionalGuestCountOverride: 1)
             context.insert(contact)
             context.insert(event)
             context.insert(invite)
@@ -234,7 +242,10 @@ final class ZoomatCleanupTests: XCTestCase {
         XCTAssertEqual(invites.count, 1)
         XCTAssertEqual(checkIns.count, 1)
         XCTAssertEqual(events[0].expirationDate, Date.distantPast)
+        XCTAssertEqual(events[0].defaultAdditionalGuestCount, 2)
         XCTAssertEqual(invites[0].contact?.name, "Legacy Contact")
+        XCTAssertEqual(invites[0].additionalGuestCountOverride, 1)
+        XCTAssertEqual(invites[0].effectiveAdditionalGuestCount, 1)
         XCTAssertEqual(checkIns[0].invite.id, invites[0].id)
     }
 

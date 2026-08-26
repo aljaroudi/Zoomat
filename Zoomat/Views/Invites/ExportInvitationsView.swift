@@ -46,7 +46,7 @@ struct ExportInvitationsView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Export (\(selectedInviteIDs.count))", action: prepareInvitations)
+                    Button("Export (\(selectedInviteIDs.count, format: .number))", action: prepareInvitations)
                         .disabled(selectedInviteIDs.isEmpty || isGenerating)
                 }
             }
@@ -113,7 +113,7 @@ struct ExportInvitationsView: View {
                 Text("Preparing invitations")
                     .font(.headline)
             } currentValueLabel: {
-                Text("\(generationProgress) of \(generationTotal)")
+                Text("\(generationProgress, format: .number) of \(generationTotal, format: .number)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -185,7 +185,7 @@ struct ExportInvitationsView: View {
             if failures == 0 {
                 showingShareSheet = true
             } else {
-                exportMessage = String(localized: "\(failures) invitations could not be prepared.")
+                exportMessage = String(localized: "\(failures, format: .number) invitations could not be prepared.")
             }
         }
     }
