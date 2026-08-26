@@ -9,12 +9,19 @@ import SwiftUI
 import SwiftData
 
 struct EventDetailView: View {
+    private struct ScannerPassShare: Identifiable {
+        let url: URL
+        var id: URL { url }
+    }
+
     @Environment(\.modelContext) private var modelContext
     @Bindable var event: Event
     @State private var showingEditSheet = false
     @State private var showingAddInvites = false
     @State private var showingCalendarEditor = false
     @State private var showingExportInvitations = false
+    @State private var scannerPassShare: ScannerPassShare?
+    @State private var scannerPassDirectory: URL?
     @State private var inviteToDelete: Invite?
     @State private var errorMessage: String?
 
@@ -44,6 +51,11 @@ struct EventDetailView: View {
                     }
                     .disabled(event.invites.isEmpty)
 
+                    Button(action: shareScannerPass) {
+                        Label("Share Scanner Pass", systemImage: "qrcode.viewfinder")
+                    }
+                    .disabled(event.invites.isEmpty)
+
                     Button {
                         showingCalendarEditor = true
                     } label: {
@@ -68,6 +80,9 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showingExportInvitations) {
             ExportInvitationsView(event: event)
+        }
+        .sheet(item: $scannerPassShare, onDismiss: removeScannerPassFiles) { share in
+            ShareSheet(items: [share.url])
         }
         .sheet(isPresented: $showingCalendarEditor) {
             EventEditViewController(isPresented: $showingCalendarEditor, event: event)
@@ -183,6 +198,33 @@ struct EventDetailView: View {
             modelContext.rollback()
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func shareScannerPass() {
+        removeScannerPassFiles()
+
+        do {
+            let pass = ScannerPass(event: event)
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+            let url = directory.appendingPathComponent(pass.suggestedFilename)
+            try pass.encodedData().write(to: url, options: .atomic)
+            scannerPassDirectory = directory
+            scannerPassShare = ScannerPassShare(url: url)
+        } catch {
+            removeScannerPassFiles()
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func removeScannerPassFiles() {
+        if let scannerPassDirectory {
+            try? FileManager.default.removeItem(at: scannerPassDirectory)
+        }
+        scannerPassDirectory = nil
+        scannerPassShare = nil
     }
 }
 
