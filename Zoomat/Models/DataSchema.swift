@@ -185,7 +185,7 @@ enum DataSchema: VersionedSchema {
         }
 
         var effectiveAdditionalGuestCount: Int? {
-            guard contact != nil else { return nil }
+            guard contact != nil || additionalGuestCountOverride != nil else { return nil }
             return additionalGuestCountOverride ?? event.defaultAdditionalGuestCount
         }
 
