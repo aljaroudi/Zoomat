@@ -129,6 +129,10 @@ enum DataSchema: VersionedSchema {
         func isEnded(at now: Date) -> Bool {
             effectiveExpirationDate < now
         }
+
+        func isActive(at now: Date) -> Bool {
+            date <= now && !isEnded(at: now)
+        }
     }
 
     @Model
@@ -218,31 +222,36 @@ enum CheckInResult: Equatable {
     case maximumReached
 }
 
-struct EventDayGroup {
-    let day: Date
-    let events: [Event]
+struct EventTimelinePartition {
+    let currentAndUpcoming: [Event]
+    let past: [Event]
 }
 
 enum EventTimeline {
-    static func groups(
-        for events: [Event],
-        now: Date,
-        calendar: Calendar = .current
-    ) -> [EventDayGroup] {
-        let grouped = Dictionary(grouping: events) { calendar.startOfDay(for: $0.date) }
-        let today = calendar.startOfDay(for: now)
-        let upcomingDays = grouped.keys.filter { $0 >= today }.sorted()
-        let endedDays = grouped.keys.filter { $0 < today }.sorted(by: >)
+    static func partition(_ events: [Event], at now: Date) -> EventTimelinePartition {
+        EventTimelinePartition(
+            currentAndUpcoming: events
+                .filter { !$0.isEnded(at: now) }
+                .sorted { $0.date < $1.date },
+            past: events
+                .filter { $0.isEnded(at: now) }
+                .sorted { $0.date > $1.date }
+        )
+    }
+}
 
-        return (upcomingDays + endedDays).map { day in
-            let dayEvents = grouped[day, default: []].sorted { first, second in
-                let firstEnded = first.isEnded(at: now)
-                let secondEnded = second.isEnded(at: now)
-                if firstEnded != secondEnded { return !firstEnded }
-                return firstEnded ? first.date > second.date : first.date < second.date
-            }
-            return EventDayGroup(day: day, events: dayEvents)
+enum ContextualDatePolicy {
+    nonisolated static func usesRelativeDate(
+        for date: Date,
+        relativeTo now: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+        let start = calendar.startOfDay(for: now)
+        let target = calendar.startOfDay(for: date)
+        guard let days = calendar.dateComponents([.day], from: start, to: target).day else {
+            return false
         }
+        return abs(days) <= 7
     }
 }
 

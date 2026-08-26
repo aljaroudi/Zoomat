@@ -173,7 +173,7 @@ private struct EventForm<Footer: View>: View {
     @Binding var draft: EventDraft
     @Binding var errorMessage: String?
     @State private var selectedImage: PhotosPickerItem?
-    @ViewBuilder let footer: () -> Footer
+    @ViewBuilder let footer: Footer
 
     init(
         draft: Binding<EventDraft>,
@@ -182,14 +182,18 @@ private struct EventForm<Footer: View>: View {
     ) {
         _draft = draft
         _errorMessage = errorMessage
-        self.footer = footer
+        self.footer = footer()
     }
 
     var body: some View {
         Form {
-            Section("Event Details") {
+            Section("Details") {
                 TextField("Title", text: $draft.title)
                 TextField("Subtitle (optional)", text: $draft.subtitle)
+                TextField("Address (optional)", text: $draft.address)
+            }
+
+            Section("Schedule") {
                 DatePicker("Date", selection: $draft.date)
                 Stepper(value: $draft.duration, in: 900...Double(Int.max), step: 900) {
                     LabeledContent(
@@ -200,7 +204,6 @@ private struct EventForm<Footer: View>: View {
                     )
                 }
                 LabeledContent("Expires", value: draft.expirationDate, format: .dateTime)
-                TextField("Address (optional)", text: $draft.address)
             }
 
             Section("Invitation Card") {
@@ -211,7 +214,7 @@ private struct EventForm<Footer: View>: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxHeight: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(.rect(cornerRadius: 8))
                     } else {
                         Label("Select Image (optional)", systemImage: "photo")
                     }
@@ -229,7 +232,7 @@ private struct EventForm<Footer: View>: View {
                 qrSection(image: image)
             }
 
-            footer()
+            footer
         }
         .onChange(of: selectedImage) { _, item in
             Task {
@@ -244,49 +247,33 @@ private struct EventForm<Footer: View>: View {
     }
 
     private func qrSection(image: UIImage) -> some View {
-        Section("QR Code Position") {
-            TemplatePreview(
+        Section {
+            QRPlacementPreview(
                 image: image,
-                qrPositionX: draft.qrPositionX,
-                qrPositionY: draft.qrPositionY,
+                qrPositionX: $draft.qrPositionX,
+                qrPositionY: $draft.qrPositionY,
                 qrSize: draft.qrSize
             )
             .frame(height: 300)
             .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            LabeledContent("Horizontal Position") {
-                Slider(value: positionBinding(for: \.qrPositionX), in: positionRange)
-                    .accessibilityLabel("Horizontal Position")
-                    .accessibilityValue(Text(draft.qrPositionX, format: .percent.precision(.fractionLength(0))))
-            }
-
-            LabeledContent("Vertical Position") {
-                Slider(value: positionBinding(for: \.qrPositionY), in: positionRange)
-                    .accessibilityLabel("Vertical Position")
-                    .accessibilityValue(Text(draft.qrPositionY, format: .percent.precision(.fractionLength(0))))
-            }
+            .clipShape(.rect(cornerRadius: 12))
 
             LabeledContent("Size") {
                 Slider(value: $draft.qrSize, in: 0.1...0.9) {
                     Text("Size")
                 }
                 .accessibilityValue(Text(draft.qrSize, format: .percent.precision(.fractionLength(0))))
-                .onChange(of: draft.qrSize) { _, _ in draft.clampPosition() }
             }
+
+            Button("Center QR Code", systemImage: "scope") {
+                draft.qrPositionX = 0.5
+                draft.qrPositionY = 0.5
+            }
+        } header: {
+            Text("QR Code")
+        } footer: {
+            Text("Drag the QR code on the preview to position it.")
         }
-    }
-
-    private var positionRange: ClosedRange<Double> {
-        let halfSize = draft.qrSize / 2
-        return halfSize...(1 - halfSize)
-    }
-
-    private func positionBinding(for keyPath: WritableKeyPath<EventDraft, Double>) -> Binding<Double> {
-        Binding(
-            get: { draft[keyPath: keyPath] },
-            set: { draft[keyPath: keyPath] = $0 }
-        )
     }
 }
 
@@ -296,10 +283,10 @@ private extension EventForm where Footer == EmptyView {
     }
 }
 
-struct TemplatePreview: View {
+private struct QRPlacementPreview: View {
     let image: UIImage
-    let qrPositionX: Double
-    let qrPositionY: Double
+    @Binding var qrPositionX: Double
+    @Binding var qrPositionY: Double
     let qrSize: Double
 
     var body: some View {
@@ -319,6 +306,7 @@ struct TemplatePreview: View {
                 positionY: qrPositionY,
                 sizeFraction: qrSize
             )
+            let interactionSide = max(rect.width, 44)
 
             ZStack(alignment: .topLeading) {
                 Image(uiImage: image)
@@ -327,18 +315,79 @@ struct TemplatePreview: View {
                     .frame(width: imageSize.width, height: imageSize.height)
                     .offset(x: imageOffset.x, y: imageOffset.y)
 
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.black.opacity(0.35))
-                    .overlay {
-                        Image(systemName: "qrcode")
-                            .font(.system(size: rect.width * 0.3))
-                            .foregroundStyle(.white)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.white)
+                        .stroke(.orange, lineWidth: 2)
+                        .frame(width: rect.width, height: rect.height)
+
+                    Image(systemName: "qrcode")
+                        .font(.system(size: rect.width * 0.3))
+                        .foregroundStyle(.black)
+                        .accessibilityHidden(true)
+                }
+                    .frame(width: interactionSide, height: interactionSide)
+                    .contentShape(.rect)
+                    .offset(
+                        x: imageOffset.x + rect.midX - interactionSide / 2,
+                        y: imageOffset.y + rect.midY - interactionSide / 2
+                    )
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .named("qr-preview"))
+                            .onChanged { value in
+                                move(to: value.location, imageSize: imageSize, imageOffset: imageOffset)
+                            }
+                    )
+                    .accessibilityElement()
+                    .accessibilityLabel("QR Code Position")
+                    .accessibilityValue(
+                        "Horizontal \(qrPositionX, format: .percent.precision(.fractionLength(0))), vertical \(qrPositionY, format: .percent.precision(.fractionLength(0)))"
+                    )
+                    .accessibilityHint("Drag to reposition, or use the available actions.")
+                    .accessibilityAction(named: "Move Left") {
+                        move(byX: -0.05, y: 0, imageSize: imageSize)
                     }
-                    .frame(width: rect.width, height: rect.height)
-                    .offset(x: imageOffset.x + rect.minX, y: imageOffset.y + rect.minY)
+                    .accessibilityAction(named: "Move Right") {
+                        move(byX: 0.05, y: 0, imageSize: imageSize)
+                    }
+                    .accessibilityAction(named: "Move Up") {
+                        move(byX: 0, y: -0.05, imageSize: imageSize)
+                    }
+                    .accessibilityAction(named: "Move Down") {
+                        move(byX: 0, y: 0.05, imageSize: imageSize)
+                    }
+                    .accessibilityAction(named: "Center") {
+                        qrPositionX = 0.5
+                        qrPositionY = 0.5
+                    }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+            .coordinateSpace(name: "qr-preview")
+            .onChange(of: qrSize) {
+                move(byX: 0, y: 0, imageSize: imageSize)
+            }
         }
+    }
+
+    private func move(to location: CGPoint, imageSize: CGSize, imageOffset: CGPoint) {
+        let point = CGPoint(
+            x: location.x - imageOffset.x,
+            y: location.y - imageOffset.y
+        )
+        apply(normalizedQRPosition(in: imageSize, at: point, sizeFraction: qrSize))
+    }
+
+    private func move(byX deltaX: Double, y deltaY: Double, imageSize: CGSize) {
+        let point = CGPoint(
+            x: (qrPositionX + deltaX) * imageSize.width,
+            y: (qrPositionY + deltaY) * imageSize.height
+        )
+        apply(normalizedQRPosition(in: imageSize, at: point, sizeFraction: qrSize))
+    }
+
+    private func apply(_ position: CGPoint) {
+        qrPositionX = position.x
+        qrPositionY = position.y
     }
 }
 

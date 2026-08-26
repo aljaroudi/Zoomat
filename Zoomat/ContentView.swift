@@ -13,7 +13,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            EventListView()
+            EventListView(showingQRScanner: $showingQRScanner)
                 .tabItem {
                     Label("Events", systemImage: "calendar")
                 }
@@ -23,28 +23,12 @@ struct ContentView: View {
                     Label("Contacts", systemImage: "person.2")
                 }
         }
-        .overlay(alignment: .bottomTrailing) {
-            // Floating QR Scanner Button
-            Button {
-                showingQRScanner = true
-            } label: {
-                Image(systemName: "qrcode.viewfinder")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 60, height: 60)
-                    .background(Color.accentColor)
-                    .clipShape(Circle())
-                    .shadow(radius: 4)
-            }
-            .padding()
-            .accessibilityLabel("Scan Invitation")
-            .accessibilityHint("Opens the camera to record a check-in")
-        }
         .fullScreenCover(isPresented: $showingQRScanner) {
             NavigationStack {
                 QRScannerView()
             }
         }
+        .tint(.orange)
     }
 }
 

@@ -5,32 +5,47 @@ import UIKit
 
 final class ZoomatCleanupTests: XCTestCase {
     @MainActor
-    func testEventTimelineGroupsByDayAndOrdersUpcomingThenEnded() throws {
+    func testEventTimelinePartitionsCurrentAndUpcomingBeforePast() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let now = try XCTUnwrap(calendar.date(from: DateComponents(
             year: 2026, month: 8, day: 26, hour: 12
         )))
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
 
         let events = [
             Event(title: "Late tomorrow", date: tomorrow.addingTimeInterval(3_600)),
-            Event(title: "Yesterday", date: yesterday),
+            Event(title: "Older past", date: now.addingTimeInterval(-7_200), expirationDate: now.addingTimeInterval(-6_000)),
             Event(title: "Soon", date: now.addingTimeInterval(600)),
-            Event(title: "Earlier today", date: now.addingTimeInterval(-600)),
+            Event(title: "Active", date: now.addingTimeInterval(-600), expirationDate: now.addingTimeInterval(600)),
+            Event(title: "Recent past", date: now.addingTimeInterval(-3_600), expirationDate: now.addingTimeInterval(-1_800)),
             Event(title: "Early tomorrow", date: tomorrow)
         ]
 
-        let groups = EventTimeline.groups(for: events, now: now, calendar: calendar)
+        let timeline = EventTimeline.partition(events, at: now)
 
-        XCTAssertEqual(groups.map(\.day), [
-            calendar.startOfDay(for: now),
-            calendar.startOfDay(for: tomorrow),
-            calendar.startOfDay(for: yesterday)
-        ])
-        XCTAssertEqual(groups[0].events.map(\.title), ["Earlier today", "Soon"])
-        XCTAssertEqual(groups[1].events.map(\.title), ["Early tomorrow", "Late tomorrow"])
+        XCTAssertEqual(timeline.currentAndUpcoming.map(\.title), ["Active", "Soon", "Early tomorrow", "Late tomorrow"])
+        XCTAssertEqual(timeline.past.map(\.title), ["Recent past", "Older past"])
+        XCTAssertTrue(timeline.currentAndUpcoming[0].isActive(at: now))
+    }
+
+    func testContextualDatePolicyUsesRelativeDatesWithinSevenCalendarDays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "ar_SA")
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Riyadh"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 8, day: 26, hour: 23, minute: 30
+        )))
+
+        for offset in -7...7 {
+            let date = try XCTUnwrap(calendar.date(byAdding: .day, value: offset, to: now))
+            XCTAssertTrue(ContextualDatePolicy.usesRelativeDate(for: date, relativeTo: now, calendar: calendar))
+        }
+
+        let eightDaysAgo = try XCTUnwrap(calendar.date(byAdding: .day, value: -8, to: now))
+        let inEightDays = try XCTUnwrap(calendar.date(byAdding: .day, value: 8, to: now))
+        XCTAssertFalse(ContextualDatePolicy.usesRelativeDate(for: eightDaysAgo, relativeTo: now, calendar: calendar))
+        XCTAssertFalse(ContextualDatePolicy.usesRelativeDate(for: inEightDays, relativeTo: now, calendar: calendar))
     }
 
     @MainActor
@@ -124,6 +139,39 @@ final class ZoomatCleanupTests: XCTestCase {
             XCTAssertLessThanOrEqual(rect.maxX, imageSize.width)
             XCTAssertLessThanOrEqual(rect.maxY, imageSize.height)
         }
+    }
+
+    func testNormalizedQRPositionClampsToRenderedImageBounds() {
+        let imageSize = CGSize(width: 1_200, height: 800)
+        let center = normalizedQRPosition(
+            in: imageSize,
+            at: CGPoint(x: 600, y: 400),
+            sizeFraction: 0.4
+        )
+        let topLeft = normalizedQRPosition(
+            in: imageSize,
+            at: CGPoint(x: -100, y: -100),
+            sizeFraction: 0.4
+        )
+        let bottomRight = normalizedQRPosition(
+            in: imageSize,
+            at: CGPoint(x: 1_300, y: 900),
+            sizeFraction: 0.4
+        )
+        let afterSizeIncrease = normalizedQRPosition(
+            in: imageSize,
+            at: CGPoint(x: bottomRight.x * imageSize.width, y: bottomRight.y * imageSize.height),
+            sizeFraction: 0.8
+        )
+
+        XCTAssertEqual(center.x, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(center.y, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(topLeft.x, 160.0 / 1_200.0, accuracy: 0.0001)
+        XCTAssertEqual(topLeft.y, 0.2, accuracy: 0.0001)
+        XCTAssertEqual(bottomRight.x, 1_040.0 / 1_200.0, accuracy: 0.0001)
+        XCTAssertEqual(bottomRight.y, 0.8, accuracy: 0.0001)
+        XCTAssertEqual(afterSizeIncrease.x, 880.0 / 1_200.0, accuracy: 0.0001)
+        XCTAssertEqual(afterSizeIncrease.y, 0.6, accuracy: 0.0001)
     }
 
     @MainActor

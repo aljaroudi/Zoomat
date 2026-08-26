@@ -94,6 +94,7 @@ struct ExportInvitationsView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Double-tap to select or deselect this invitation")
+                    .accessibilityAddTraits(selectedInviteIDs.contains(invite.id) ? .isSelected : [])
                 }
             }
 
@@ -208,21 +209,21 @@ struct InviteSelectionRow: View {
 
                 if let contact = invite.contact, let contactInfo = contact.phone ?? contact.email {
                     Text(contactInfo)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else if invite.contact == nil {
                     Text("General admission")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Spacer()
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? .blue : .gray)
+                .foregroundStyle(isSelected ? .orange : .secondary)
                 .font(.title3)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 

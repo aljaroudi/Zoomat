@@ -56,7 +56,7 @@ struct EventDetailView: View {
                         Label("Duplicate", systemImage: "doc.on.doc")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Label("Event Actions", systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -98,7 +98,7 @@ struct EventDetailView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(maxHeight: 200)
-                        .cornerRadius(8)
+                        .clipShape(.rect(cornerRadius: 8))
                     Spacer()
                 }
                 .listRowInsets(EdgeInsets())
@@ -209,11 +209,11 @@ struct InviteRowView: View {
 
                 if let maxCheckIns = invite.maxCheckIns {
                     Text("\(invite.checkIns.count) of \(maxCheckIns) check-ins")
-                        .font(.caption2)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
                     Text("\(invite.checkIns.count) check-ins")
-                        .font(.caption2)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -222,7 +222,7 @@ struct InviteRowView: View {
 
             if invite.hasReachedLimit {
                 Text("Maximum reached")
-                    .font(.caption2)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

@@ -41,9 +41,9 @@ struct AddInvitesView: View {
         }
 
         return available.filter { contact in
-            contact.name.localizedCaseInsensitiveContains(searchText) ||
-            contact.email?.localizedCaseInsensitiveContains(searchText) == true ||
-            contact.phone?.localizedCaseInsensitiveContains(searchText) == true
+            contact.name.localizedStandardContains(searchText) ||
+            contact.email?.localizedStandardContains(searchText) == true ||
+            contact.phone?.localizedStandardContains(searchText) == true
         }
     }
 
@@ -177,6 +177,7 @@ struct AddInvitesView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Double-tap to select or deselect this contact")
+                .accessibilityAddTraits(selectedContactIDs.contains(contact.id) ? .isSelected : [])
             }
         }
     }
@@ -226,30 +227,24 @@ struct ContactSelectionRow: View {
 
                 if let email = contact.email {
                     Text(email)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
                 if let phone = contact.phone {
                     Text(phone)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Spacer()
 
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.blue)
-                    .font(.title3)
-            } else {
-                Image(systemName: "circle")
-                    .foregroundStyle(.gray)
-                    .font(.title3)
-            }
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isSelected ? .orange : .secondary)
+                .font(.title3)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 

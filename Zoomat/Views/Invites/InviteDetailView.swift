@@ -14,97 +14,87 @@ struct InviteDetailView: View {
     @State private var showingShareSheet = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Invitation Card Preview
+        List {
             if let card = generatedCard {
                 Image(uiImage: card)
                     .resizable()
                     .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(radius: 10)
-                    .padding()
+                    .clipShape(.rect(cornerRadius: 12))
+                    .frame(maxWidth: .infinity)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .accessibilityLabel("Invitation card for \(invite.displayName)")
             } else {
                 ProgressView("Generating invitation...")
-                    .frame(height: 400)
-                    .padding()
+                    .frame(maxWidth: .infinity, minHeight: 240)
+                    .listRowBackground(Color.clear)
             }
 
-            Form {
-                // Guest Info
-                Section("Guest") {
-                    if let contact = invite.contact {
-                        NavigationLink {
-                            ContactDetailView(contact: contact)
-                        } label: {
-                            Label(contact.name, systemImage: "person.fill")
-                        }
-                    } else {
-                        Label(invite.displayName, systemImage: "ticket")
-                            .foregroundStyle(.secondary)
+            Section("Guest") {
+                if let contact = invite.contact {
+                    NavigationLink(value: contact) {
+                        Label(contact.name, systemImage: "person.fill")
                     }
+                } else {
+                    Label(invite.displayName, systemImage: "ticket")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Event") {
+                Text(invite.event.title)
+
+                if !invite.event.subtitle.isEmpty {
+                    Text(invite.event.subtitle)
+                        .foregroundStyle(.secondary)
                 }
 
-                // Event Info
-                Section("Event") {
-                    Text(invite.event.title)
+                Label(
+                    invite.event.date.formatted(date: .long, time: .shortened),
+                    systemImage: "calendar"
+                )
 
-                    if !invite.event.subtitle.isEmpty {
-                        Text(invite.event.subtitle)
-                            .foregroundStyle(.secondary)
-                    }
+                if let address = invite.event.address {
+                    Label(address, systemImage: "location")
+                }
+            }
 
-                    Label(
-                        invite.event.date.formatted(date: .long, time: .shortened),
-                        systemImage: "calendar"
-                    )
+            if let maxCheckIns = invite.maxCheckIns {
+                Section("Check-in Limit") {
+                    LabeledContent("Progress", value: "\(invite.checkIns.count) / \(maxCheckIns)")
 
-                    if let address = invite.event.address {
-                        Label(address, systemImage: "location")
+                    if invite.hasReachedLimit {
+                        Label("Maximum reached", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
                     }
                 }
+            }
 
-                // Check-in Limit (if set)
-                if let maxCheckIns = invite.maxCheckIns {
-                    Section("Check-in Limit") {
-                        HStack {
-                            Text("Progress")
-                            Spacer()
-                            Text("\(invite.checkIns.count) / \(maxCheckIns)")
-                                .foregroundStyle(invite.hasReachedLimit ? .red : .secondary)
-                        }
-
-                        if invite.hasReachedLimit {
-                            Label("Maximum reached", systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                        }
-                    }
-                }
-
-                Section("Status") {
-                    if invite.checkIns.isEmpty {
-                        Label("Not checked in", systemImage: "circle")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(invite.checkInsNewestFirst) { checkIn in
-                            Label(
-                                checkIn.created.formatted(date: .abbreviated, time: .shortened),
-                                systemImage: "checkmark.circle.fill"
-                            )
-                            .foregroundStyle(.green)
-                        }
+            Section("Status") {
+                if invite.checkIns.isEmpty {
+                    Label("Not checked in", systemImage: "circle")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(invite.checkInsNewestFirst) { checkIn in
+                        Label(
+                            checkIn.created.formatted(date: .abbreviated, time: .shortened),
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(.green)
                     }
                 }
             }
         }
         .navigationTitle("Invitation")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Contact.self) { contact in
+            ContactDetailView(contact: contact)
+        }
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if generatedCard != nil {
-                    Button {
+                    Button("Share Invitation", systemImage: "square.and.arrow.up") {
                         showingShareSheet = true
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
                     }
                 }
             }
