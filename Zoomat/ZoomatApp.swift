@@ -10,21 +10,35 @@ import SwiftData
 
 @main
 struct ZoomatApp: App {
-    var sharedModelContainer: ModelContainer = {
+    private let modelContainerResult: Result<ModelContainer, Error>
+
+    init() {
         let schema = Schema(DataSchema.models)
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            modelContainerResult = .success(
+                try ModelContainer(for: schema, configurations: [modelConfiguration])
+            )
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            modelContainerResult = .failure(error)
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            switch modelContainerResult {
+            case .success(let container):
+                ContentView()
+                    .modelContainer(container)
+            case .failure(let error):
+                ContentUnavailableView {
+                    Label("Data Couldn’t Be Opened", systemImage: "externaldrive.badge.exclamationmark")
+                } description: {
+                    Text("Your data was left unchanged. Close and reopen Zoomat to try again.\n\n\(error.localizedDescription)")
+                }
+                .padding()
+            }
         }
-        .modelContainer(sharedModelContainer)
     }
 }

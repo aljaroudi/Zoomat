@@ -85,7 +85,7 @@ struct InviteDetailView: View {
                         Label("Not checked in", systemImage: "circle")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(invite.checkIns) { checkIn in
+                        ForEach(invite.checkInsNewestFirst) { checkIn in
                             Label(
                                 checkIn.created.formatted(date: .abbreviated, time: .shortened),
                                 systemImage: "checkmark.circle.fill"
@@ -120,13 +120,9 @@ struct InviteDetailView: View {
     }
 
     private func generateCard() {
-        Task {
-            let card = await Task.detached {
-                await MainActor.run {
-                    invite.generateInvitationCard()
-                }
-            }.value
-            generatedCard = card
+        Task { @MainActor in
+            await Task.yield()
+            generatedCard = invite.generateInvitationCard()
         }
     }
 }

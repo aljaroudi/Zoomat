@@ -11,6 +11,25 @@ import SwiftUI
 import ImageIO
 import UniformTypeIdentifiers
 
+nonisolated func qrRect(
+    in imageSize: CGSize,
+    positionX: Double,
+    positionY: Double,
+    sizeFraction: Double
+) -> CGRect {
+    let minimumDimension = min(imageSize.width, imageSize.height)
+    let side = minimumDimension * min(max(sizeFraction, 0.1), 1)
+    let proposedX = imageSize.width * min(max(positionX, 0), 1) - side / 2
+    let proposedY = imageSize.height * min(max(positionY, 0), 1) - side / 2
+
+    return CGRect(
+        x: min(max(proposedX, 0), max(imageSize.width - side, 0)),
+        y: min(max(proposedY, 0), max(imageSize.height - side, 0)),
+        width: side,
+        height: side
+    )
+}
+
 extension Invite {
     /// Generates a QR code image for this invite
     private func generateQRCode(size: CGSize = CGSize(width: 512, height: 512)) -> UIImage? {
@@ -46,38 +65,31 @@ extension Invite {
             return generateQRCode()
         }
 
-        // Calculate QR size based on percentage of smallest dimension
-        let minDimension = min(eventImage.size.width, eventImage.size.height)
-        let qrWidth = minDimension * event.qrSize
-        let qrSize = CGSize(width: qrWidth, height: qrWidth)
+        let rect = qrRect(
+            in: eventImage.size,
+            positionX: event.qrPositionX,
+            positionY: event.qrPositionY,
+            sizeFraction: event.qrSize
+        )
 
-        guard let qrImage = generateQRCode(size: qrSize) else {
+        guard let qrImage = generateQRCode(size: rect.size) else {
             return eventImage
         }
 
-        // Create renderer with event image size
-        let renderer = UIGraphicsImageRenderer(size: eventImage.size)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: eventImage.size, format: format)
 
         return renderer.image { context in
-            // Draw event image background
+            context.cgContext.interpolationQuality = .high
             eventImage.draw(at: .zero)
-
-            // Calculate QR position (event uses normalized 0-1 coordinates)
-            let qrX = eventImage.size.width * event.qrPositionX - qrWidth / 2
-            let qrY = eventImage.size.height * event.qrPositionY - qrWidth / 2
-
-            // Draw QR code
-            let qrRect = CGRect(
-                x: qrX,
-                y: qrY,
-                width: qrWidth,
-                height: qrWidth
-            )
-            qrImage.draw(in: qrRect)
+            context.cgContext.interpolationQuality = .none
+            qrImage.draw(in: rect)
         }
     }
 
-    /// Generates an invitation card with embedded metadata (readable in iOS Photos app)
+    /// Generates an invitation card with metadata preserved when the image is shared.
     func generateInvitationCardWithMetadata() -> Data? {
         guard let image = generateInvitationCard(),
               let cgImage = image.cgImage else {

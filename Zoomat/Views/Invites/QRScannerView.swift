@@ -2,82 +2,102 @@
 //  QRScannerView.swift
 //  Zoomat
 //
-//  Created by Mohammed on 11/9/25.
-//
 
 import SwiftUI
 import SwiftData
-import AVFoundation
+@preconcurrency import AVFoundation
 
 struct QRScannerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var allInvites: [Invite]
     @State private var scanner = QRScanner()
-    @State var checkInStatus: CheckInStatus = .waiting
-    @State private var currentEventId: UUID?
+    @State private var checkInStatus: CheckInStatus = .waiting
+    @State private var currentEventID: UUID?
 
     var body: some View {
         ZStack {
-            // Camera preview as background
             QRScannerCameraView(scanner: scanner)
                 .ignoresSafeArea()
-                .opacity(0.4)
+                .opacity(0.45)
 
-            // Status overlay - full screen
             statusOverlay
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: .bottom)
         }
         .navigationTitle("Check In")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Done") {
-                    dismiss()
-                }
+                Button("Close") { dismiss() }
             }
         }
         .onAppear {
-            scanner.onCodeScanned = { code in
-                handleScannedCode(code)
-            }
+            scanner.onCodeScanned = handleScannedCode
         }
-        .onChange(of: checkInStatus) { oldValue, newValue in
-            // Resume scanning after showing result
-            if case .waiting = newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    scanner.startScanning()
-                }
+        .onChange(of: checkInStatus) { _, status in
+            if case .waiting = status {
+                scanner.startScanning()
             }
         }
     }
 
-    private var eventStats: (total: Int, checkedIn: Int, remaining: Int)? {
-        guard let eventId = currentEventId else {
-            return nil
-        }
-
-        let eventInvites = allInvites.filter { $0.event.id == eventId }
-        let total = eventInvites.count
-        let checkedIn = eventInvites.filter { !$0.checkIns.isEmpty }.count
-        let remaining = total - checkedIn
-
-        return (total, checkedIn, remaining)
+    private var eventStats: (invitations: Int, checkIns: Int, unused: Int)? {
+        guard let currentEventID else { return nil }
+        let invitations = allInvites.filter { $0.event.id == currentEventID }
+        return (
+            invitations.count,
+            invitations.reduce(0) { $0 + $1.checkIns.count },
+            invitations.filter(\.checkIns.isEmpty).count
+        )
     }
 
     @ViewBuilder
     private var statusOverlay: some View {
         switch checkInStatus {
         case .waiting:
-            scanningView
-        case .success(let invite):
-            successView(invite: invite)
-        case .alreadyCheckedIn(let invite, _):
-            alreadyCheckedInView(invite: invite)
-        case .maxReached(let invite):
-            maxReachedView(invite: invite)
-        case .failure(_):
-            failureView()
+            switch scanner.cameraState {
+            case .loading:
+                cameraMessage("Preparing Camera", systemImage: "camera", showRetry: false)
+            case .ready:
+                scanningView
+            case .denied:
+                cameraMessage(
+                    "Camera Access Denied",
+                    description: String(localized: "Allow camera access in Settings to scan invitations."),
+                    systemImage: "camera.fill.badge.xmark",
+                    showRetry: false
+                )
+            case .unavailable:
+                cameraMessage(
+                    "Camera Unavailable",
+                    description: String(localized: "A camera is required to scan invitations."),
+                    systemImage: "camera.fill.badge.ellipsis",
+                    showRetry: true
+                )
+            case .failed(let message):
+                cameraMessage(
+                    "Camera Setup Failed",
+                    description: message,
+                    systemImage: "exclamationmark.triangle",
+                    showRetry: true
+                )
+            }
+        case .recorded(let invite, let count):
+            resultView(
+                invite: invite,
+                title: "Check-in #\(count) recorded",
+                systemImage: "checkmark.circle.fill",
+                color: .green
+            )
+        case .maximumReached(let invite):
+            resultView(
+                invite: invite,
+                title: "Maximum Reached",
+                systemImage: "hand.raised.fill",
+                color: .red
+            )
+        case .failure(let reason):
+            failureView(reason: reason)
         }
     }
 
@@ -85,15 +105,15 @@ struct QRScannerView: View {
         VStack(spacing: 16) {
             Spacer()
 
-            // Show stats if we have a current event
-            if let stats = eventStats {
-                statsBar(stats: stats)
+            if let eventStats {
+                statsBar(stats: eventStats)
                     .padding(.bottom, 20)
             }
 
             Image(systemName: "qrcode.viewfinder")
                 .font(.system(size: 60))
                 .foregroundStyle(.white)
+                .accessibilityHidden(true)
 
             Text("Scanning for check-in code...")
                 .font(.headline)
@@ -102,297 +122,160 @@ struct QRScannerView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Material.ultraThin)
+        .background(.ultraThinMaterial)
     }
 
-    private func successView(invite: Invite) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-                .frame(height: 80)
-
-            // Show stats at top
-            if let stats = eventStats {
-                statsBar(stats: stats)
-                    .padding(.bottom, 20)
+    private func resultView(invite: Invite, title: LocalizedStringKey, systemImage: String, color: Color) -> some View {
+        VStack(spacing: 24) {
+            if let eventStats {
+                statsBar(stats: eventStats)
             }
 
-            // Contact name at top
+            Spacer()
+
             Text(invite.displayName)
-                .font(.system(size: 48, weight: .bold))
+                .font(.largeTitle.bold())
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .minimumScaleFactor(0.65)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 32)
+                .padding(.horizontal)
 
-            Spacer()
-
-            // Center content
-            VStack(spacing: 20) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.white)
-
-                Text(invite.event.title)
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-
-            Spacer()
-
-            // Button at bottom
-            Button {
-                checkInStatus = .waiting
-            } label: {
-                Text("Continue Scanning")
-                    .font(.headline)
-                    .foregroundStyle(.green)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 60)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.thinMaterial)
-        .background(.green.opacity(0.6))
-    }
-
-    private func alreadyCheckedInView(invite: Invite) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-                .frame(height: 80)
-
-            // Show stats at top
-            if let stats = eventStats {
-                statsBar(stats: stats)
-                    .padding(.bottom, 20)
-            }
-
-            // Contact name at top
-            Text(invite.displayName)
-                .font(.system(size: 48, weight: .bold))
+            Image(systemName: systemImage)
+                .font(.system(size: 80))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 32)
+                .accessibilityHidden(true)
 
-            Spacer()
-
-            // Center content
-            VStack(spacing: 20) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.white)
-
-                Text("Already Checked In")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.95))
-
-                if case .alreadyCheckedIn(_, let previousCount) = checkInStatus,
-                   previousCount > 0,
-                   let lastCheckIn = invite.checkIns.dropLast().last {
-                    // x minutes ago ago
-                    Text(lastCheckIn.created.formatted(.relative(presentation: .named)))
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-            }
-
-            Spacer()
-
-            // Button at bottom
-            Button {
-                checkInStatus = .waiting
-            } label: {
-                Text("Continue Scanning")
-                    .font(.headline)
-                    .foregroundStyle(.orange)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 60)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.thinMaterial)
-        .background(.orange.opacity(0.6))
-    }
-
-    private func maxReachedView(invite: Invite) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-                .frame(height: 80)
-
-            // Show stats at top
-            if let stats = eventStats {
-                statsBar(stats: stats)
-                    .padding(.bottom, 20)
-            }
-
-            // Contact name at top
-            Text(invite.displayName)
-                .font(.system(size: 48, weight: .bold))
+            Text(title)
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 32)
+
+            Text(invite.event.title)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.9))
 
             Spacer()
 
-            // Center content
-            VStack(spacing: 20) {
-                Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.white)
-
-                Text("Maximum Reached")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.95))
-
-                if let maxCheckIns = invite.maxCheckIns {
-                    Text("^[\(maxCheckIns) check-in](inflect: true) allowed")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-            }
-
-            Spacer()
-
-            // Button at bottom
-            Button {
-                checkInStatus = .waiting
-            } label: {
-                Text("Continue Scanning")
-                    .font(.headline)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 60)
+            continueButton(color: color)
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.thinMaterial)
-        .background(.red.opacity(0.6))
+        .background(color.opacity(0.65))
     }
 
-    private func failureView() -> some View {
-        VStack(spacing: 0) {
+    private func failureView(reason: String) -> some View {
+        VStack(spacing: 24) {
             Spacer()
 
-            // Center content
-            VStack(spacing: 20) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.white)
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(.white)
+                .accessibilityHidden(true)
 
-                Text("Invalid Code")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(.white)
-            }
+            Text("Invalid Code")
+                .font(.largeTitle.bold())
+                .foregroundStyle(.white)
+
+            Text(reason)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.9))
 
             Spacer()
-
-            // Button at bottom
-            Button {
-                checkInStatus = .waiting
-            } label: {
-                Text("Try Again")
-                    .font(.headline)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 60)
+            continueButton(color: .red)
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.thinMaterial)
-        .background(.red.opacity(0.6))
+        .background(.red.opacity(0.65))
     }
 
-    @ViewBuilder
-    private func statsBar(stats: (total: Int, checkedIn: Int, remaining: Int)) -> some View {
-        HStack(spacing: 20) {
-            StatsBadge(
-                label: "Total",
-                value: stats.total,
-                color: .blue
-            )
+    private func continueButton(color: Color) -> some View {
+        Button("Continue Scanning") {
+            checkInStatus = .waiting
+        }
+        .font(.headline)
+        .foregroundStyle(color)
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
 
-            StatsBadge(
-                label: "Checked In",
-                value: stats.checkedIn,
-                color: .green
-            )
+    private func cameraMessage(
+        _ title: LocalizedStringKey,
+        description: String? = nil,
+        systemImage: String,
+        showRetry: Bool
+    ) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
+            if let description { Text(description) }
+        } actions: {
+            if showRetry {
+                Button("Try Again") { scanner.retryCameraSetup() }
+                    .buttonStyle(.borderedProminent)
+            }
+            Button("Close") { dismiss() }
+                .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial)
+    }
 
-            StatsBadge(
-                label: "Remaining",
-                value: stats.remaining,
-                color: .orange
-            )
+    private func statsBar(stats: (invitations: Int, checkIns: Int, unused: Int)) -> some View {
+        HStack(spacing: 12) {
+            StatsBadge(label: "Invitations", value: stats.invitations, color: .blue)
+            StatsBadge(label: "Check-ins", value: stats.checkIns, color: .green)
+            StatsBadge(label: "Unused", value: stats.unused, color: .orange)
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal)
     }
 
     private func handleScannedCode(_ code: String) {
-        guard let uuid = UUID(uuidString: code) else {
-            checkInStatus = .failure(reason: "QR code format is invalid")
+        guard let id = UUID(uuidString: code) else {
+            showFailure("QR code format is invalid.")
             return
         }
 
-        // Find invite by ID
-        let descriptor = FetchDescriptor<Invite>(
-            predicate: #Predicate { $0.id == uuid }
-        )
+        let descriptor = FetchDescriptor<Invite>(predicate: #Predicate { $0.id == id })
+        do {
+            guard let invite = try modelContext.fetch(descriptor).first else {
+                showFailure("Invitation not found.")
+                return
+            }
 
-        guard let invite = try? modelContext.fetch(descriptor).first else {
-            checkInStatus = .failure(reason: "Invite not found")
-            return
+            currentEventID = invite.event.id
+            switch try invite.recordCheckIn(in: modelContext) {
+            case .recorded(let count):
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                checkInStatus = .recorded(invite: invite, count: count)
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: String(localized: "Check-in #\(count) recorded")
+                )
+            case .maximumReached:
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                checkInStatus = .maximumReached(invite: invite)
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Maximum Reached"))
+            }
+        } catch {
+            showFailure(error.localizedDescription)
         }
+    }
 
-        // Track current event for stats
-        currentEventId = invite.event.id
-
-        // Check if max limit already reached BEFORE adding new check-in
-        if invite.hasReachedLimit {
-            // Haptic feedback for error
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
-
-            checkInStatus = .maxReached(invite: invite)
-            return
-        }
-
-        // Check status BEFORE adding new check-in
-        let hadPreviousCheckIns = !invite.checkIns.isEmpty
-        let previousCheckInCount = invite.checkIns.count
-
-        // Create check-in (allow multiple check-ins up to limit)
-        let checkIn = CheckIn(invite: invite)
-        modelContext.insert(checkIn)
-
-        // Try to save to ensure the relationship is updated
-        try? modelContext.save()
-
-        // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-
-        // Show appropriate status based on PREVIOUS state
-        if hadPreviousCheckIns {
-            checkInStatus = .alreadyCheckedIn(invite: invite, previousCount: previousCheckInCount)
-        } else {
-            checkInStatus = .success(invite: invite)
-        }
+    private func showFailure(_ reason: String) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        checkInStatus = .failure(reason: reason)
+        UIAccessibility.post(notification: .announcement, argument: reason)
     }
 }
 
@@ -406,42 +289,42 @@ struct StatsBadge: View {
             Text(value, format: .number)
                 .font(.title2.bold())
                 .foregroundStyle(color)
-
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 }
 
 enum CheckInStatus: Equatable {
     case waiting
-    case success(invite: Invite)
-    case alreadyCheckedIn(invite: Invite, previousCount: Int)
-    case maxReached(invite: Invite)
+    case recorded(invite: Invite, count: Int)
+    case maximumReached(invite: Invite)
     case failure(reason: String)
 }
 
-// MARK: - QR Scanner Camera View
+enum CameraState: Equatable {
+    case loading
+    case ready
+    case denied
+    case unavailable
+    case failed(String)
+}
+
 struct QRScannerCameraView: UIViewRepresentable {
     let scanner: QRScanner
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
         view.backgroundColor = .black
-
         scanner.setupCamera(on: view)
-        scanner.startScanning()
-
         return view
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        // Update preview layer frame when view size changes
-        DispatchQueue.main.async {
-            scanner.updatePreviewFrame(to: uiView.bounds)
-        }
+        scanner.updatePreviewFrame(to: uiView.bounds)
     }
 
     func dismantleUIView(_ uiView: UIView, coordinator: ()) {
@@ -449,42 +332,80 @@ struct QRScannerCameraView: UIViewRepresentable {
     }
 }
 
-// QR Scanner Class
 @Observable
-class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+    private let sessionQueue = DispatchQueue(label: "com.zooma.qr-scanner")
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private weak var previewView: UIView?
     private var isProcessing = false
+
+    private(set) var cameraState: CameraState = .loading
     var onCodeScanned: ((String) -> Void)?
 
     func setupCamera(on view: UIView) {
-        let session = AVCaptureSession()
+        previewView = view
+        cameraState = .loading
 
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video),
-              let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice),
-              session.canAddInput(videoInput) else {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            configureCamera(on: view)
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self, weak view] granted in
+                DispatchQueue.main.async {
+                    guard let self, let view else { return }
+                    granted ? self.configureCamera(on: view) : (self.cameraState = .denied)
+                }
+            }
+        case .denied, .restricted:
+            cameraState = .denied
+        @unknown default:
+            cameraState = .failed(String(localized: "Unknown camera authorization state."))
+        }
+    }
+
+    func retryCameraSetup() {
+        guard let previewView else { return }
+        stopScanning()
+        captureSession = nil
+        previewLayer?.removeFromSuperlayer()
+        previewLayer = nil
+        setupCamera(on: previewView)
+    }
+
+    private func configureCamera(on view: UIView) {
+        guard let device = AVCaptureDevice.default(for: .video) else {
+            cameraState = .unavailable
             return
         }
 
-        session.addInput(videoInput)
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            let output = AVCaptureMetadataOutput()
+            let session = AVCaptureSession()
 
-        let metadataOutput = AVCaptureMetadataOutput()
+            guard session.canAddInput(input), session.canAddOutput(output) else {
+                cameraState = .failed(String(localized: "The camera could not be configured."))
+                return
+            }
 
-        guard session.canAddOutput(metadataOutput) else {
-            return
+            session.addInput(input)
+            session.addOutput(output)
+            output.setMetadataObjectsDelegate(self, queue: .main)
+            output.metadataObjectTypes = [.qr]
+
+            let layer = AVCaptureVideoPreviewLayer(session: session)
+            layer.frame = view.bounds
+            layer.videoGravity = .resizeAspectFill
+            view.layer.addSublayer(layer)
+
+            captureSession = session
+            previewLayer = layer
+            cameraState = .ready
+            startScanning()
+        } catch {
+            cameraState = .failed(error.localizedDescription)
         }
-
-        session.addOutput(metadataOutput)
-        metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-        metadataOutput.metadataObjectTypes = [.qr]
-
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.frame = view.layer.bounds
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-
-        self.captureSession = session
-        self.previewLayer = previewLayer
     }
 
     func updatePreviewFrame(to bounds: CGRect) {
@@ -492,12 +413,18 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     func startScanning() {
+        guard cameraState == .ready, let session = captureSession else { return }
         isProcessing = false
-        captureSession?.startRunning()
+        sessionQueue.async {
+            if !session.isRunning { session.startRunning() }
+        }
     }
 
     func stopScanning() {
-        captureSession?.stopRunning()
+        guard let session = captureSession else { return }
+        sessionQueue.async {
+            if session.isRunning { session.stopRunning() }
+        }
     }
 
     func metadataOutput(
@@ -505,27 +432,17 @@ class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         didOutput metadataObjects: [AVMetadataObject],
         from connection: AVCaptureConnection
     ) {
-        // Prevent duplicate scans
-        guard !isProcessing else { return }
+        guard !isProcessing,
+              let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+              let value = object.stringValue else { return }
 
-        guard let metadataObject = metadataObjects.first,
-              let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-              let stringValue = readableObject.stringValue else {
-            return
-        }
-
-        // Mark as processing and stop scanning immediately
         isProcessing = true
         stopScanning()
-
-        // Notify delegate
-        onCodeScanned?(stringValue)
+        onCodeScanned?(value)
     }
 }
 
 #Preview {
-    NavigationStack {
-        QRScannerView()
-    }
-    .modelContainer(previewContainer)
+    NavigationStack { QRScannerView() }
+        .modelContainer(previewContainer)
 }

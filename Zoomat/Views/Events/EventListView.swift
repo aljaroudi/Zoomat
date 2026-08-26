@@ -2,31 +2,32 @@
 //  EventListView.swift
 //  Zoomat
 //
-//  Created by Mohammed on 11/9/25.
-//
 
 import SwiftUI
 import SwiftData
 
 struct EventListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Event.date, order: .reverse) private var events: [Event]
+    @Query private var events: [Event]
     @State private var showingCreateEvent = false
-
-    var groupedEvents: [String : [Event]] {
-        Dictionary(grouping: events, by: \.relativeDate)
-    }
+    @State private var eventToDelete: Event?
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
-            Group {
-                if events.isEmpty {
-                    emptyState
-                } else {
-                    eventList
+            TimelineView(.periodic(from: .now, by: 60)) { timeline in
+                Group {
+                    if events.isEmpty {
+                        emptyState
+                    } else {
+                        eventList(now: timeline.date)
+                    }
                 }
             }
             .navigationTitle("Events")
+            .navigationDestination(for: Event.self) { event in
+                EventDetailView(event: event)
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -34,66 +35,73 @@ struct EventListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Create Event")
                 }
             }
             .sheet(isPresented: $showingCreateEvent) {
                 CreateEventView()
             }
+            .confirmationDialog(
+                "Delete this event and all its invitations and check-ins?",
+                isPresented: Binding(
+                    get: { eventToDelete != nil },
+                    set: { if !$0 { eventToDelete = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete Event", role: .destructive, action: deleteEvent)
+                Button("Cancel", role: .cancel) { eventToDelete = nil }
+            }
+            .saveErrorAlert(message: $errorMessage)
         }
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No Events",
-            systemImage: "calendar.badge.plus",
-            description: Text("Create your first event to start inviting people")
-        )
-    }
-
-    private var sortedHeaders: [String] {
-        // Map headers to their earliest event date for proper sorting
-        let headerDates = Dictionary(uniqueKeysWithValues:
-                                        groupedEvents.map { header, events in
-            (header, events.map(\.date).max() ?? .distantPast)
+        ContentUnavailableView {
+            Label("No Events", systemImage: "calendar.badge.plus")
+        } description: {
+            Text("Create your first event to start inviting people")
+        } actions: {
+            Button("Create Event") { showingCreateEvent = true }
+                .buttonStyle(.borderedProminent)
         }
-        )
-
-        return headerDates.sorted { $0.value > $1.value }.map { $0.key }
     }
 
-
-    private var eventList: some View {
+    private func eventList(now: Date) -> some View {
         List {
-            ForEach(sortedHeaders, id: \.self) { date in
-                Section(date.localizedCapitalized) {
-                    ForEach(groupedEvents[date] ?? []) { event in
+            ForEach(EventTimeline.groups(for: events, now: now), id: \.day) { group in
+                Section(group.day.formatted(.dateTime.weekday(.wide).month(.wide).day())) {
+                    ForEach(group.events) { event in
                         NavigationLink(value: event) {
-                            EventRowView(event: event)
+                            EventRowView(event: event, now: now)
                         }
-                    }
-                    .onDelete { offsets in
-                        deleteEvents(at: offsets, for: date)
+                        .swipeActions(allowsFullSwipe: false) {
+                            Button("Delete", role: .destructive) {
+                                eventToDelete = event
+                            }
+                        }
                     }
                 }
             }
         }
         .listStyle(.grouped)
-        .navigationDestination(for: Event.self) { event in
-            EventDetailView(event: event)
-        }
     }
 
-    private func deleteEvents(at offsets: IndexSet, for date: String) {
-        let eventsForDate = groupedEvents[date] ?? []
-        for index in offsets {
-            modelContext.delete(eventsForDate[index])
+    private func deleteEvent() {
+        guard let eventToDelete else { return }
+        modelContext.delete(eventToDelete)
+
+        do {
+            try modelContext.save()
+            self.eventToDelete = nil
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
     }
 }
 
 #Preview {
-    NavigationStack {
-        EventListView()
-    }
-    .modelContainer(previewContainer)
+    EventListView()
+        .modelContainer(previewContainer)
 }

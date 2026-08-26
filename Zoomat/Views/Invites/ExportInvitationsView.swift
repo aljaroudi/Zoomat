@@ -2,12 +2,9 @@
 //  ExportInvitationsView.swift
 //  Zoomat
 //
-//  Created by Mohammed on 11/21/25.
-//
 
 import SwiftUI
 import SwiftData
-import Photos
 
 struct ExportInvitationsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -16,29 +13,26 @@ struct ExportInvitationsView: View {
     @State private var selectedInviteIDs: Set<UUID>
     @State private var isGenerating = false
     @State private var generationProgress = 0
-    @State private var saveSuccessCount = 0
-    @State private var saveErrorCount = 0
-    @State private var showingCompleted = false
+    @State private var generationTotal = 0
     @State private var showingShareSheet = false
     @State private var shareImageURLs: [URL] = []
+    @State private var exportMessage: String?
+    @State private var exportDirectory: URL?
 
     init(event: Event) {
         self.event = event
-        // Select all invites by default
-        _selectedInviteIDs = State(initialValue: Set(event.invites.map { $0.id }))
+        _selectedInviteIDs = State(initialValue: Set(event.invites.map(\.id)))
     }
 
-    var selectedInvites: [Invite] {
+    private var selectedInvites: [Invite] {
         event.invites.filter { selectedInviteIDs.contains($0.id) }
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            Group {
                 if isGenerating {
                     generatingView
-                } else if showingCompleted {
-                    completedView
                 } else {
                     invitesList
                 }
@@ -47,66 +41,64 @@ struct ExportInvitationsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(showingCompleted ? "Done" : "Cancel") {
-                        dismiss()
-                    }
-                    .disabled(isGenerating)
+                    Button("Cancel", role: .cancel) { dismiss() }
+                        .disabled(isGenerating)
                 }
 
-                if !showingCompleted {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Export (\(selectedInviteIDs.count))") {
-                            exportViaShare()
-                        }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Export (\(selectedInviteIDs.count))", action: prepareInvitations)
                         .disabled(selectedInviteIDs.isEmpty || isGenerating)
-                    }
                 }
             }
             .sheet(isPresented: $showingShareSheet) {
-                if !shareImageURLs.isEmpty {
-                    ShareSheet(items: shareImageURLs)
-                }
+                ShareSheet(items: shareImageURLs)
             }
+            .alert(
+                "Export Incomplete",
+                isPresented: Binding(
+                    get: { exportMessage != nil },
+                    set: { if !$0 { exportMessage = nil } }
+                )
+            ) {
+                if !shareImageURLs.isEmpty {
+                    Button("Share Available") { showingShareSheet = true }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(exportMessage ?? "Please try again.")
+            }
+            .onDisappear(perform: removeTemporaryFiles)
         }
     }
 
     private var invitesList: some View {
         List {
             Section {
-                Button {
-                    if selectedInviteIDs.count == event.invites.count {
-                        selectedInviteIDs.removeAll()
-                    } else {
-                        selectedInviteIDs = Set(event.invites.map { $0.id })
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: selectedInviteIDs.count == event.invites.count ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(.blue)
-                        Text(selectedInviteIDs.count == event.invites.count ? "Deselect All" : "Select All")
-                    }
+                Button(action: toggleAll) {
+                    Label(
+                        selectedInviteIDs.count == event.invites.count ? "Deselect All" : "Select All",
+                        systemImage: selectedInviteIDs.count == event.invites.count ? "checkmark.square.fill" : "square"
+                    )
                 }
             }
 
             Section("Invitations") {
-                ForEach(event.invites) { invite in
-                    InviteSelectionRow(
-                        invite: invite,
-                        isSelected: selectedInviteIDs.contains(invite.id)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if selectedInviteIDs.contains(invite.id) {
-                            selectedInviteIDs.remove(invite.id)
-                        } else {
-                            selectedInviteIDs.insert(invite.id)
-                        }
+                ForEach(event.invites.sorted { $0.created < $1.created }) { invite in
+                    Button {
+                        toggle(invite)
+                    } label: {
+                        InviteSelectionRow(
+                            invite: invite,
+                            isSelected: selectedInviteIDs.contains(invite.id)
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Double-tap to select or deselect this invitation")
                 }
             }
 
             Section {
-                Text("Exported images will include invitation details in metadata, visible in iOS Photos app.")
+                Text("Prepared images include invitation details in their metadata and are shared only through the destination you choose.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -114,177 +106,93 @@ struct ExportInvitationsView: View {
     }
 
     private var generatingView: some View {
-        VStack(spacing: 24) {
+        VStack {
             Spacer()
-
-            ProgressView(value: Double(generationProgress), total: Double(selectedInviteIDs.count)) {
-                Text("Saving to Photos")
+            ProgressView(value: Double(generationProgress), total: Double(generationTotal)) {
+                Text("Preparing invitations")
                     .font(.headline)
             } currentValueLabel: {
-                Text("\(generationProgress) / \(selectedInviteIDs.count)")
+                Text("\(generationProgress) of \(generationTotal)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .progressViewStyle(.linear)
             .padding(.horizontal, 40)
-
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
     }
 
-    private var completedView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: saveErrorCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(saveErrorCount == 0 ? .green : .orange)
-
-            VStack(spacing: 8) {
-                Text("^[Saved \(saveSuccessCount) invitation](inflect: true)")
-                    .font(.title3.bold())
-
-                if saveErrorCount > 0 {
-                    Text("\(saveErrorCount) failed to save")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
-    }
-
-    private func saveToPhotos() {
-        // Check/request photo library permission
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-
-        if status == .notDetermined {
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
-                DispatchQueue.main.async {
-                    if newStatus == .authorized || newStatus == .limited {
-                        performSave()
-                    }
-                }
-            }
-        } else if status == .authorized || status == .limited {
-            performSave()
+    private func toggleAll() {
+        if selectedInviteIDs.count == event.invites.count {
+            selectedInviteIDs.removeAll()
+        } else {
+            selectedInviteIDs = Set(event.invites.map(\.id))
         }
     }
 
-    private func performSave() {
+    private func toggle(_ invite: Invite) {
+        if selectedInviteIDs.contains(invite.id) {
+            selectedInviteIDs.remove(invite.id)
+        } else {
+            selectedInviteIDs.insert(invite.id)
+        }
+    }
+
+    private func prepareInvitations() {
+        let invitations = selectedInvites
         isGenerating = true
         generationProgress = 0
-        saveSuccessCount = 0
-        saveErrorCount = 0
+        generationTotal = invitations.count
+        shareImageURLs = []
+        removeTemporaryFiles()
 
-        Task {
-            print("Starting to save \(selectedInvites.count) invitations")
+        Task { @MainActor in
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
 
-            for (index, invite) in selectedInvites.enumerated() {
-                await MainActor.run {
-                    print("Processing invite \(index + 1)/\(selectedInvites.count): \(invite.displayName)")
-                }
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                exportDirectory = directory
+            } catch {
+                isGenerating = false
+                exportMessage = error.localizedDescription
+                return
+            }
 
-                // Generate invitation card with metadata (must be on main actor for SwiftData)
-                let imageData = await MainActor.run {
-                    invite.generateInvitationCardWithMetadata()
-                }
-
-                guard let imageData else {
-                    await MainActor.run {
-                        print("❌ Failed to generate image for \(invite.displayName)")
-                        saveErrorCount += 1
-                        generationProgress += 1
-                    }
+            var failures = 0
+            for (index, invite) in invitations.enumerated() {
+                defer { generationProgress += 1 }
+                guard let imageData = invite.generateInvitationCardWithMetadata() else {
+                    failures += 1
                     continue
                 }
 
-                print("✓ Generated image data: \(imageData.count) bytes")
-
-                // Save to photo library with metadata using continuation
-                print("Attempting to save to Photos...")
-                let saveResult: Result<Void, Error> = await withCheckedContinuation { continuation in
-                    PHPhotoLibrary.shared().performChanges({
-                        print("Inside performChanges block")
-                        let creationRequest = PHAssetCreationRequest.forAsset()
-                        creationRequest.addResource(with: .photo, data: imageData, options: nil)
-                        print("Added resource to request")
-                    }, completionHandler: { success, error in
-                        print("Completion handler called: success=\(success), error=\(String(describing: error))")
-                        if success {
-                            continuation.resume(returning: .success(()))
-                        } else {
-                            continuation.resume(returning: .failure(error ?? NSError(domain: "PhotoSave", code: -1)))
-                        }
-                    })
+                let safeName = invite.displayName.replacingOccurrences(of: "/", with: "-")
+                let fileURL = directory.appendingPathComponent("\(safeName)_\(index + 1).jpg")
+                do {
+                    try imageData.write(to: fileURL, options: .atomic)
+                    shareImageURLs.append(fileURL)
+                } catch {
+                    failures += 1
                 }
-
-                switch saveResult {
-                case .success:
-                    print("✓ Saved to Photos")
-                    await MainActor.run {
-                        saveSuccessCount += 1
-                        generationProgress += 1
-                    }
-                case .failure(let error):
-                    print("❌ Failed to save photo: \(error)")
-                    await MainActor.run {
-                        saveErrorCount += 1
-                        generationProgress += 1
-                    }
-                }
+                await Task.yield()
             }
 
-            print("Completed: \(saveSuccessCount) saved, \(saveErrorCount) failed")
-            await MainActor.run {
-                isGenerating = false
-                showingCompleted = true
+            isGenerating = false
+            if failures == 0 {
+                showingShareSheet = true
+            } else {
+                exportMessage = String(localized: "\(failures) invitations could not be prepared.")
             }
         }
     }
 
-    private func exportViaShare() {
-        isGenerating = true
-        generationProgress = 0
-        shareImageURLs = []
-
-        Task { @MainActor in
-            print("Generating images for share sheet")
-
-            // Create temporary directory for images
-            let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
-            for (index, invite) in selectedInvites.enumerated() {
-                // Generate invitation card with metadata
-                if let imageData = invite.generateInvitationCardWithMetadata() {
-                    // Save to temporary file with metadata preserved
-                    let fileName = "\(invite.displayName.replacingOccurrences(of: "/", with: "-"))_\(index + 1).jpg"
-                    let fileURL = tempDir.appendingPathComponent(fileName)
-
-                    do {
-                        try imageData.write(to: fileURL)
-                        shareImageURLs.append(fileURL)
-                        print("✓ Created file: \(fileName) with metadata")
-                    } catch {
-                        print("❌ Failed to write file: \(error)")
-                    }
-                }
-                generationProgress += 1
-            }
-
-            print("Generated \(shareImageURLs.count) images with metadata")
-            isGenerating = false
-
-            if !shareImageURLs.isEmpty {
-                showingShareSheet = true
-            }
-        }
+    private func removeTemporaryFiles() {
+        guard let exportDirectory else { return }
+        try? FileManager.default.removeItem(at: exportDirectory)
+        self.exportDirectory = nil
     }
 }
 
@@ -298,13 +206,11 @@ struct InviteSelectionRow: View {
                 Text(invite.displayName)
                     .font(.headline)
 
-                if let contact = invite.contact {
-                    if let contactInfo = contact.phone ?? contact.email {
-                        Text(contactInfo)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
+                if let contact = invite.contact, let contactInfo = contact.phone ?? contact.email {
+                    Text(contactInfo)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if invite.contact == nil {
                     Text("General admission")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -312,7 +218,6 @@ struct InviteSelectionRow: View {
             }
 
             Spacer()
-
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(isSelected ? .blue : .gray)
                 .font(.title3)
@@ -322,25 +227,6 @@ struct InviteSelectionRow: View {
 }
 
 #Preview {
-    let container = previewContainer
-    let context = container.mainContext
-
-    // Create sample event with invites
-    let event = Event(
-        title: "Sample Wedding",
-        date: Date()
-    )
-    let contact1 = Contact(name: "John Doe", phone: "555-0100")
-    let contact2 = Contact(name: "Jane Smith", email: "jane@example.com")
-    let invite1 = Invite(contact: contact1, event: event)
-    let invite2 = Invite(contact: contact2, event: event)
-
-    context.insert(event)
-    context.insert(contact1)
-    context.insert(contact2)
-    context.insert(invite1)
-    context.insert(invite2)
-
-    return ExportInvitationsView(event: event)
-        .modelContainer(container)
+    ExportInvitationsView(event: .mock)
+        .modelContainer(previewContainer)
 }

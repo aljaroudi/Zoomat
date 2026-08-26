@@ -15,6 +15,8 @@ struct ContactListView: View {
     @State private var showingCreateContact = false
     @State private var showingImportContacts = false
     @State private var searchText = ""
+    @State private var contactToDelete: Contact?
+    @State private var errorMessage: String?
 
     var filteredContacts: [Contact] {
         if searchText.isEmpty {
@@ -63,15 +65,30 @@ struct ContactListView: View {
             .sheet(isPresented: $showingImportContacts) {
                 ImportContactsView()
             }
+            .confirmationDialog(
+                "Delete this contact and all linked invitations and check-ins?",
+                isPresented: Binding(
+                    get: { contactToDelete != nil },
+                    set: { if !$0 { contactToDelete = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete Contact", role: .destructive, action: deleteContact)
+                Button("Cancel", role: .cancel) { contactToDelete = nil }
+            }
+            .saveErrorAlert(message: $errorMessage)
         }
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No Contacts",
-            systemImage: "person.crop.circle.badge.plus",
-            description: Text("Add contacts manually or import from your device")
-        )
+        ContentUnavailableView {
+            Label("No Contacts", systemImage: "person.crop.circle.badge.plus")
+        } description: {
+            Text("Add contacts manually or import from your device")
+        } actions: {
+            Button("Add Contact") { showingCreateContact = true }
+                .buttonStyle(.borderedProminent)
+        }
     }
 
     private var contactList: some View {
@@ -80,17 +97,31 @@ struct ContactListView: View {
                 NavigationLink(value: contact) {
                     ContactRowView(contact: contact)
                 }
+                .swipeActions(allowsFullSwipe: false) {
+                    Button("Delete", role: .destructive) {
+                        contactToDelete = contact
+                    }
+                }
             }
-            .onDelete(perform: deleteContacts)
         }
         .navigationDestination(for: Contact.self) { contact in
             ContactDetailView(contact: contact)
         }
     }
 
-    private func deleteContacts(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(filteredContacts[index])
+    private func deleteContact() {
+        guard let contactToDelete else { return }
+        for invite in contactToDelete.invites {
+            modelContext.delete(invite)
+        }
+        modelContext.delete(contactToDelete)
+
+        do {
+            try modelContext.save()
+            self.contactToDelete = nil
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
     }
 }

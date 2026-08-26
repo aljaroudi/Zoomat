@@ -38,12 +38,9 @@ struct ContactDetailView: View {
                                 .foregroundStyle(.secondary)
 
                             if !invite.checkIns.isEmpty {
-                                HStack {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                    Text("Checked In")
-                                        .font(.caption2)
-                                }
+                                Label("\(invite.checkIns.count) check-ins", systemImage: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
                             }
                         }
                     }
@@ -80,6 +77,7 @@ struct CreateContactView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var namesText = ""
+    @State private var errorMessage: String?
 
     private var validNames: [String] {
         namesText
@@ -129,6 +127,7 @@ struct CreateContactView: View {
                     .disabled(validNames.isEmpty)
                 }
             }
+            .saveErrorAlert(message: $errorMessage)
         }
     }
 
@@ -137,7 +136,13 @@ struct CreateContactView: View {
             let contact = Contact(name: name)
             modelContext.insert(contact)
         }
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -145,49 +150,92 @@ struct EditContactView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @Bindable var contact: Contact
+    let contact: Contact
+    @State private var name: String
+    @State private var email: String
+    @State private var phone: String
+    @State private var errorMessage: String?
+    @State private var showingDeleteConfirmation = false
+
+    init(contact: Contact) {
+        self.contact = contact
+        _name = State(initialValue: contact.name)
+        _email = State(initialValue: contact.email ?? "")
+        _phone = State(initialValue: contact.phone ?? "")
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Contact Information") {
-                    TextField("Name", text: $contact.name)
-                    TextField("Email (optional)", text: Binding(
-                        get: { contact.email ?? "" },
-                        set: { contact.email = $0.isEmpty ? nil : $0 }
-                    ))
+                    TextField("Name", text: $name)
+                    TextField("Email (optional)", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
                     .autocapitalization(.none)
-                    TextField("Phone (optional)", text: Binding(
-                        get: { contact.phone ?? "" },
-                        set: { contact.phone = $0.isEmpty ? nil : $0 }
-                    ))
+                    TextField("Phone (optional)", text: $phone)
                     .textContentType(.telephoneNumber)
                     .keyboardType(.phonePad)
                 }
 
                 Section {
                     Button("Delete Contact", role: .destructive) {
-                        deleteContact()
+                        showingDeleteConfirmation = true
                     }
                 }
             }
             .navigationTitle("Edit Contact")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                    Button("Done", action: saveContact)
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .confirmationDialog(
+                "Delete this contact and all linked invitations and check-ins?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Contact", role: .destructive, action: deleteContact)
+                Button("Cancel", role: .cancel) {}
+            }
+            .saveErrorAlert(message: $errorMessage)
+        }
+    }
+
+    private func saveContact() {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        contact.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        contact.email = trimmedEmail.isEmpty ? nil : trimmedEmail
+        contact.phone = trimmedPhone.isEmpty ? nil : trimmedPhone
+
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
     }
 
     private func deleteContact() {
+        for invite in contact.invites {
+            modelContext.delete(invite)
+        }
         modelContext.delete(contact)
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

@@ -23,6 +23,8 @@ struct AddInvitesView: View {
     @State private var mode: InviteCreationMode = .fromContacts
     @State private var selectedContactIDs: Set<UUID> = []
     @State private var searchText = ""
+    @State private var errorMessage: String?
+    @State private var showingCreateContact = false
 
     // Blank invite settings
     @State private var blankInviteQuantity = 1
@@ -73,21 +75,24 @@ struct AddInvitesView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(confirmButtonTitle) {
-                        addInvites()
-                    }
+                    Button(action: addInvites) { confirmButtonLabel }
                     .disabled(!canAddInvites)
                 }
+            }
+            .saveErrorAlert(message: $errorMessage)
+            .sheet(isPresented: $showingCreateContact) {
+                CreateContactView()
             }
         }
     }
 
-    private var confirmButtonTitle: String {
+    @ViewBuilder
+    private var confirmButtonLabel: some View {
         switch mode {
         case .fromContacts:
-            return "Add (\(selectedContactIDs.count))"
+            Text("Add (\(selectedContactIDs.count))")
         case .blank:
-            return "Create (\(blankInviteQuantity))"
+            Text("Create (\(blankInviteQuantity))")
         }
     }
 
@@ -141,11 +146,14 @@ struct AddInvitesView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No Contacts",
-            systemImage: "person.crop.circle.badge.plus",
-            description: Text("Add contacts first to create invites")
-        )
+        ContentUnavailableView {
+            Label("No Contacts", systemImage: "person.crop.circle.badge.plus")
+        } description: {
+            Text("Add contacts first to create invites")
+        } actions: {
+            Button("Add Contact") { showingCreateContact = true }
+                .buttonStyle(.borderedProminent)
+        }
     }
 
     private var noResultsState: some View {
@@ -155,18 +163,20 @@ struct AddInvitesView: View {
     private var contactList: some View {
         List {
             ForEach(filteredContacts) { contact in
-                ContactSelectionRow(
-                    contact: contact,
-                    isSelected: selectedContactIDs.contains(contact.id)
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
+                Button {
                     if selectedContactIDs.contains(contact.id) {
                         selectedContactIDs.remove(contact.id)
                     } else {
                         selectedContactIDs.insert(contact.id)
                     }
+                } label: {
+                    ContactSelectionRow(
+                        contact: contact,
+                        isSelected: selectedContactIDs.contains(contact.id)
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("Double-tap to select or deselect this contact")
             }
         }
     }
@@ -194,8 +204,13 @@ struct AddInvitesView: View {
             }
         }
 
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
