@@ -1,0 +1,20 @@
+Guest allowances
+
+- Create an event without changing Guest Allowance. Confirm its default is 0 additional guests.
+- Create and edit events with allowances from 0 through 10.
+- Add named invitations using the event default, then change the event default and confirm those invitations update.
+- Override one named invitation with a custom allowance, including 0, and confirm later event-default changes do not affect it.
+- Switch an overridden invitation back to Event Default.
+- Confirm blank/general-admission invitations do not show a guest allowance and can be scanned repeatedly.
+- Scan named invitations and confirm the recorded result shows and announces the correct guest allowance.
+
+Localization
+
+- Test in English and Arabic, including right-to-left layout.
+- Confirm invitation, contact, check-in, progress, and action counts use locale-appropriate digits and separators.
+- Confirm singular and plural count labels read naturally.
+
+Data integrity
+
+- Relaunch after creating event defaults and invitation overrides; confirm both values persist.
+- Confirm existing events, invitations, contacts, and check-ins remain available after updating.

@@ -25,13 +25,44 @@ struct ScannerPass: Codable, Equatable {
         let date: Date
         let expirationDate: Date?
         let address: String?
+        let defaultAdditionalGuestCount: Int?
+
+        init(
+            id: UUID,
+            title: String,
+            subtitle: String,
+            date: Date,
+            expirationDate: Date?,
+            address: String?,
+            defaultAdditionalGuestCount: Int? = nil
+        ) {
+            self.id = id
+            self.title = title
+            self.subtitle = subtitle
+            self.date = date
+            self.expirationDate = expirationDate
+            self.address = address
+            self.defaultAdditionalGuestCount = defaultAdditionalGuestCount
+        }
     }
 
     struct InviteSnapshot: Codable, Equatable {
         let id: UUID
         let created: Date
         let displayName: String
-        let maxCheckIns: Int?
+        let additionalGuestCount: Int?
+
+        init(
+            id: UUID,
+            created: Date,
+            displayName: String,
+            additionalGuestCount: Int? = nil
+        ) {
+            self.id = id
+            self.created = created
+            self.displayName = displayName
+            self.additionalGuestCount = additionalGuestCount
+        }
     }
 
     init(version: Int = currentVersion, event: EventSnapshot, invites: [InviteSnapshot]) {
@@ -49,7 +80,8 @@ struct ScannerPass: Codable, Equatable {
                 subtitle: event.subtitle,
                 date: event.date,
                 expirationDate: event.expirationDate,
-                address: event.address
+                address: event.address,
+                defaultAdditionalGuestCount: event.defaultAdditionalGuestCount
             ),
             invites: event.invites
                 .sorted { $0.created < $1.created }
@@ -58,7 +90,7 @@ struct ScannerPass: Codable, Equatable {
                         id: $0.id,
                         created: $0.created,
                         displayName: $0.displayName,
-                        maxCheckIns: $0.maxCheckIns
+                        additionalGuestCount: $0.effectiveAdditionalGuestCount
                     )
                 }
         )
@@ -138,9 +170,15 @@ struct ScannerPass: Codable, Equatable {
             guard !invite.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ScannerPassError.invalidFile
             }
-            if let maxCheckIns = invite.maxCheckIns, maxCheckIns < 1 {
-                throw ScannerPassError.invalidCheckInLimit
+            if let additionalGuestCount = invite.additionalGuestCount,
+               !(0...10).contains(additionalGuestCount) {
+                throw ScannerPassError.invalidGuestAllowance
             }
+        }
+
+        if let defaultAdditionalGuestCount = event.defaultAdditionalGuestCount,
+           !(0...10).contains(defaultAdditionalGuestCount) {
+            throw ScannerPassError.invalidGuestAllowance
         }
     }
 }
@@ -151,25 +189,25 @@ enum ScannerPassError: LocalizedError, Equatable {
     case fileTooLarge
     case tooManyInvites
     case duplicateInvite
-    case invalidCheckInLimit
+    case invalidGuestAllowance
     case conflictingInvite
 
     var errorDescription: String? {
         switch self {
         case .invalidFile:
-            "This is not a valid Zoomat scanner pass."
+            String(localized: "This is not a valid Zoomat scanner pass.")
         case .unsupportedVersion:
-            "This scanner pass requires a newer version of Zoomat."
+            String(localized: "This scanner pass requires a newer version of Zoomat.")
         case .fileTooLarge:
-            "This scanner pass is too large to import."
+            String(localized: "This scanner pass is too large to import.")
         case .tooManyInvites:
-            "This scanner pass contains too many invitations."
+            String(localized: "This scanner pass contains too many invitations.")
         case .duplicateInvite:
-            "This scanner pass contains duplicate invitations."
-        case .invalidCheckInLimit:
-            "This scanner pass contains an invalid check-in limit."
+            String(localized: "This scanner pass contains duplicate invitations.")
+        case .invalidGuestAllowance:
+            String(localized: "This scanner pass contains an invalid guest allowance.")
         case .conflictingInvite:
-            "An invitation in this scanner pass belongs to another local event."
+            String(localized: "An invitation in this scanner pass belongs to another local event.")
         }
     }
 }
@@ -196,6 +234,9 @@ enum ScannerPassImporter {
             event.date = pass.event.date
             event.expirationDate = pass.event.expirationDate
             event.address = pass.event.address
+            if let defaultAdditionalGuestCount = pass.event.defaultAdditionalGuestCount {
+                event.defaultAdditionalGuestCount = defaultAdditionalGuestCount
+            }
             event.updated = .now
         } else {
             event = Event(
@@ -203,7 +244,8 @@ enum ScannerPassImporter {
                 subtitle: pass.event.subtitle,
                 date: pass.event.date,
                 expirationDate: pass.event.expirationDate,
-                address: pass.event.address
+                address: pass.event.address,
+                defaultAdditionalGuestCount: pass.event.defaultAdditionalGuestCount ?? 0
             )
             event.id = pass.event.id
             context.insert(event)
@@ -217,13 +259,17 @@ enum ScannerPassImporter {
                     }
                     invite.created = snapshot.created
                     invite.contactName = snapshot.displayName
-                    invite.maxCheckIns = snapshot.maxCheckIns
+                    if let additionalGuestCount = snapshot.additionalGuestCount {
+                        invite.additionalGuestCountOverride = additionalGuestCount
+                    } else if invite.contact == nil {
+                        invite.additionalGuestCountOverride = nil
+                    }
                 } else {
                     let invite = Invite(
                         contact: nil,
                         event: event,
                         contactName: snapshot.displayName,
-                        maxCheckIns: snapshot.maxCheckIns
+                        additionalGuestCountOverride: snapshot.additionalGuestCount
                     )
                     invite.id = snapshot.id
                     invite.created = snapshot.created

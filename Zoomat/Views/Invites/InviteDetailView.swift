@@ -12,6 +12,7 @@ struct InviteDetailView: View {
     @Bindable var invite: Invite
     @State private var generatedCard: UIImage?
     @State private var showingShareSheet = false
+    @State private var showingGuestAllowanceEditor = false
 
     var body: some View {
         List {
@@ -41,6 +42,28 @@ struct InviteDetailView: View {
                 }
             }
 
+            if let additionalGuestCount = invite.effectiveAdditionalGuestCount {
+                Section("Guest Allowance") {
+                    LabeledContent(
+                        "Additional Guests",
+                        value: additionalGuestCount,
+                        format: .number
+                    )
+
+                    LabeledContent("Setting") {
+                        if invite.additionalGuestCountOverride == nil {
+                            Text("Event Default")
+                        } else {
+                            Text("Custom")
+                        }
+                    }
+
+                    Button("Edit Guest Allowance", systemImage: "person.2") {
+                        showingGuestAllowanceEditor = true
+                    }
+                }
+            }
+
             Section("Event") {
                 Text(invite.event.title)
 
@@ -56,17 +79,6 @@ struct InviteDetailView: View {
 
                 if let address = invite.event.address {
                     Label(address, systemImage: "location")
-                }
-            }
-
-            if let maxCheckIns = invite.maxCheckIns {
-                Section("Check-in Limit") {
-                    LabeledContent("Progress", value: "\(invite.checkIns.count) / \(maxCheckIns)")
-
-                    if invite.hasReachedLimit {
-                        Label("Maximum reached", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                    }
                 }
             }
 
@@ -107,12 +119,85 @@ struct InviteDetailView: View {
                 ShareSheet(items: [card])
             }
         }
+        .sheet(isPresented: $showingGuestAllowanceEditor) {
+            GuestAllowanceEditor(invite: invite)
+        }
     }
 
     private func generateCard() {
         Task { @MainActor in
             await Task.yield()
             generatedCard = invite.generateInvitationCard()
+        }
+    }
+}
+
+private struct GuestAllowanceEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    let invite: Invite
+    @State private var usesEventDefault: Bool
+    @State private var customAdditionalGuestCount: Int
+    @State private var errorMessage: String?
+
+    init(invite: Invite) {
+        self.invite = invite
+        _usesEventDefault = State(initialValue: invite.additionalGuestCountOverride == nil)
+        _customAdditionalGuestCount = State(
+            initialValue: invite.additionalGuestCountOverride ?? invite.event.defaultAdditionalGuestCount
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle("Use Event Default", isOn: $usesEventDefault)
+
+                    if usesEventDefault {
+                        LabeledContent(
+                            "Additional Guests",
+                            value: invite.event.defaultAdditionalGuestCount,
+                            format: .number
+                        )
+                    } else {
+                        Stepper(value: $customAdditionalGuestCount, in: 0...10) {
+                            LabeledContent(
+                                "Additional Guests",
+                                value: customAdditionalGuestCount,
+                                format: .number
+                            )
+                        }
+                    }
+                } footer: {
+                    Text("This allowance is shown to the person scanning the invitation. Additional guests do not check in separately.")
+                }
+            }
+            .navigationTitle("Guest Allowance")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", action: saveAllowance)
+                }
+            }
+            .saveErrorAlert(message: $errorMessage)
+        }
+    }
+
+    private func saveAllowance() {
+        invite.additionalGuestCountOverride = usesEventDefault ? nil : customAdditionalGuestCount
+
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
     }
 }

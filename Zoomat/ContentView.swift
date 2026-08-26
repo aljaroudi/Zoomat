@@ -52,7 +52,7 @@ struct ContentView: View {
             let result = try ScannerPassImporter.importPass(pass, into: modelContext)
             scannerPassAlertTitle = String(localized: "Scanner Pass Imported")
             scannerPassMessage = String(
-                localized: "\(result.eventTitle) is ready with \(result.invitationCount) invitations. Counts and limits apply only to this phone."
+                localized: "\(result.eventTitle) is ready with \(result.invitationCount, format: .number) invitations. Counts are stored only on this phone."
             )
         } catch {
             scannerPassAlertTitle = String(localized: "Couldn’t Import Scanner Pass")

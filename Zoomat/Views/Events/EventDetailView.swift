@@ -132,6 +132,11 @@ struct EventDetailView: View {
                 )
             )
             LabeledContent("Expires", value: event.effectiveExpirationDate, format: .dateTime)
+            LabeledContent(
+                "Default Additional Guests",
+                value: event.defaultAdditionalGuestCount,
+                format: .number
+            )
 
             if event.isEnded(at: .now) {
                 LabeledContent("Status") {
@@ -249,24 +254,18 @@ struct InviteRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let maxCheckIns = invite.maxCheckIns {
-                    Text("\(invite.checkIns.count) of \(maxCheckIns) check-ins")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("\(invite.checkIns.count) check-ins")
+                if let allowanceText = invite.additionalGuestAllowanceText {
+                    Text(allowanceText)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            Spacer()
-
-            if invite.hasReachedLimit {
-                Text("Maximum reached")
+                Text("\(invite.checkIns.count, format: .number) check-ins")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Spacer()
         }
     }
 }

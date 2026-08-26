@@ -13,10 +13,11 @@ final class ScannerPassTests: XCTestCase {
             date: Date(timeIntervalSince1970: 1_700_000_000),
             expirationDate: Date(timeIntervalSince1970: 1_700_003_600),
             address: "Main Hall",
+            defaultAdditionalGuestCount: 2,
             imageData: Data("private-image".utf8)
         )
         let contact = Contact(name: "Guest", phone: "+966500000000", email: "private@example.com")
-        let invite = Invite(contact: contact, event: event, maxCheckIns: 2)
+        let invite = Invite(contact: contact, event: event, additionalGuestCountOverride: 1)
         context.insert(contact)
         context.insert(event)
         context.insert(invite)
@@ -29,6 +30,8 @@ final class ScannerPassTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.invites.map(\.id), [invite.id])
+        XCTAssertEqual(decoded.event.defaultAdditionalGuestCount, 2)
+        XCTAssertEqual(decoded.invites[0].additionalGuestCount, 1)
         XCTAssertFalse(json.contains("+966500000000"))
         XCTAssertFalse(json.contains("private@example.com"))
         XCTAssertFalse(json.contains("private-image"))
@@ -53,7 +56,7 @@ final class ScannerPassTests: XCTestCase {
     }
 
     @MainActor
-    func testDecoderRejectsDuplicateInvitesAndInvalidLimits() throws {
+    func testDecoderRejectsDuplicateInvitesAndInvalidGuestAllowances() throws {
         let valid = pass()
         let duplicate = ScannerPass(
             event: valid.event,
@@ -63,19 +66,19 @@ final class ScannerPassTests: XCTestCase {
             XCTAssertEqual(error as? ScannerPassError, .duplicateInvite)
         }
 
-        let invalidLimit = ScannerPass(
+        let invalidAllowance = ScannerPass(
             event: valid.event,
             invites: [
                 ScannerPass.InviteSnapshot(
                     id: UUID(),
                     created: .now,
                     displayName: "Guest",
-                    maxCheckIns: 0
+                    additionalGuestCount: 11
                 )
             ]
         )
-        XCTAssertThrowsError(try ScannerPass.decode(try rawData(for: invalidLimit))) { error in
-            XCTAssertEqual(error as? ScannerPassError, .invalidCheckInLimit)
+        XCTAssertThrowsError(try ScannerPass.decode(try rawData(for: invalidAllowance))) { error in
+            XCTAssertEqual(error as? ScannerPassError, .invalidGuestAllowance)
         }
     }
 
@@ -106,20 +109,21 @@ final class ScannerPassTests: XCTestCase {
                 subtitle: "Updated details",
                 date: original.event.date,
                 expirationDate: original.event.expirationDate,
-                address: "Updated Address"
+                address: "Updated Address",
+                defaultAdditionalGuestCount: 3
             ),
             invites: [
                 ScannerPass.InviteSnapshot(
                     id: importedInvite.id,
                     created: importedInvite.created,
                     displayName: "Updated Guest",
-                    maxCheckIns: 3
+                    additionalGuestCount: 2
                 ),
                 ScannerPass.InviteSnapshot(
                     id: addedInviteID,
                     created: .now,
                     displayName: "New Guest",
-                    maxCheckIns: nil
+                    additionalGuestCount: nil
                 )
             ]
         )
@@ -134,9 +138,11 @@ final class ScannerPassTests: XCTestCase {
         XCTAssertEqual(invites.count, 2)
         XCTAssertEqual(events[0].title, "Updated Event")
         XCTAssertEqual(events[0].imageData, Data("local-image".utf8))
+        XCTAssertEqual(events[0].defaultAdditionalGuestCount, 3)
         XCTAssertEqual(refreshedInvite.contact?.name, "Local Contact")
         XCTAssertEqual(refreshedInvite.contactName, "Updated Guest")
-        XCTAssertEqual(refreshedInvite.maxCheckIns, 3)
+        XCTAssertEqual(refreshedInvite.additionalGuestCountOverride, 2)
+        XCTAssertEqual(refreshedInvite.effectiveAdditionalGuestCount, 2)
         XCTAssertEqual(refreshedInvite.checkIns.count, 1)
         XCTAssertTrue(invites.contains { $0.id == addedInviteID })
     }
@@ -165,7 +171,7 @@ final class ScannerPassTests: XCTestCase {
                     id: existingInvite.id,
                     created: .now,
                     displayName: "Collision",
-                    maxCheckIns: nil
+                    additionalGuestCount: nil
                 )
             ]
         )
@@ -189,8 +195,8 @@ final class ScannerPassTests: XCTestCase {
 
         let firstInvite = try XCTUnwrap(firstContainer.mainContext.fetch(FetchDescriptor<Invite>()).first)
         let secondInvite = try XCTUnwrap(secondContainer.mainContext.fetch(FetchDescriptor<Invite>()).first)
-        XCTAssertEqual(try firstInvite.recordCheckIn(in: firstContainer.mainContext), .recorded(count: 1))
-        XCTAssertEqual(try secondInvite.recordCheckIn(in: secondContainer.mainContext), .recorded(count: 1))
+        XCTAssertEqual(try firstInvite.recordCheckIn(in: firstContainer.mainContext), 1)
+        XCTAssertEqual(try secondInvite.recordCheckIn(in: secondContainer.mainContext), 1)
         XCTAssertEqual(firstInvite.checkIns.count, 1)
         XCTAssertEqual(secondInvite.checkIns.count, 1)
     }
@@ -205,14 +211,15 @@ final class ScannerPassTests: XCTestCase {
                 subtitle: "Details",
                 date: Date(timeIntervalSince1970: 1_700_000_000),
                 expirationDate: Date(timeIntervalSince1970: 1_700_003_600),
-                address: "Venue"
+                address: "Venue",
+                defaultAdditionalGuestCount: 2
             ),
             invites: [
                 ScannerPass.InviteSnapshot(
                     id: UUID(),
                     created: Date(timeIntervalSince1970: 1_699_999_000),
                     displayName: "Guest",
-                    maxCheckIns: 1
+                    additionalGuestCount: 1
                 )
             ]
         )

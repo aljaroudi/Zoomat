@@ -56,7 +56,7 @@ struct QRScannerView: View {
             switch status {
             case .recorded:
                 .success
-            case .maximumReached, .failure:
+            case .failure:
                 .error
             case .waiting:
                 nil
@@ -125,16 +125,9 @@ struct QRScannerView: View {
         case .recorded(let invite, let count):
             resultView(
                 invite: invite,
-                title: "Check-in #\(count) recorded on this phone",
+                title: "Check-in #\(count, format: .number) recorded on this phone",
                 systemImage: "checkmark.circle.fill",
                 color: .green
-            )
-        case .maximumReached(let invite):
-            resultView(
-                invite: invite,
-                title: "Maximum Reached on This Phone",
-                systemImage: "hand.raised.fill",
-                color: .red
             )
         case .failure(let reason):
             failureView(reason: reason)
@@ -181,6 +174,18 @@ struct QRScannerView: View {
                 .minimumScaleFactor(0.65)
                 .foregroundStyle(.white)
                 .padding(.horizontal)
+
+            if let allowanceText = invite.additionalGuestAllowanceText {
+                Label {
+                    Text(allowanceText)
+                        .font(.headline)
+                } icon: {
+                    Image(systemName: "person.2")
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            }
 
             Image(systemName: systemImage)
                 .font(.largeTitle)
@@ -303,20 +308,12 @@ struct QRScannerView: View {
             }
 
             currentEventID = invite.event.id
-            switch try invite.recordCheckIn(in: modelContext) {
-            case .recorded(let count):
-                checkInStatus = .recorded(invite: invite, count: count)
-                UIAccessibility.post(
-                    notification: .announcement,
-                    argument: String(localized: "Check-in #\(count) recorded on this phone")
-                )
-            case .maximumReached:
-                checkInStatus = .maximumReached(invite: invite)
-                UIAccessibility.post(
-                    notification: .announcement,
-                    argument: String(localized: "Maximum Reached on This Phone")
-                )
-            }
+            let count = try invite.recordCheckIn(in: modelContext)
+            checkInStatus = .recorded(invite: invite, count: count)
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: recordedAnnouncement(for: invite, count: count)
+            )
         } catch {
             showFailure(error.localizedDescription)
         }
@@ -337,7 +334,7 @@ struct QRScannerView: View {
             checkInStatus = .waiting
             scannerPassAlertTitle = String(localized: "Scanner Pass Imported")
             scannerPassMessage = String(
-                localized: "\(result.eventTitle) is ready with \(result.invitationCount) invitations. Counts and limits apply only to this phone."
+                localized: "\(result.eventTitle) is ready with \(result.invitationCount, format: .number) invitations. Counts are stored only on this phone."
             )
         } catch let error as CocoaError where error.code == .userCancelled {
             return
@@ -350,6 +347,21 @@ struct QRScannerView: View {
     private func showFailure(_ reason: String) {
         checkInStatus = .failure(reason: reason)
         UIAccessibility.post(notification: .announcement, argument: reason)
+    }
+
+    private func recordedAnnouncement(for invite: Invite, count: Int) -> String {
+        guard let additionalGuestCount = invite.effectiveAdditionalGuestCount else {
+            return String(localized: "Check-in #\(count, format: .number) recorded on this phone")
+        }
+
+        switch additionalGuestCount {
+        case 0:
+            return String(localized: "Check-in #\(count, format: .number) recorded on this phone. No additional guests.")
+        case 1:
+            return String(localized: "Check-in #\(count, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guest allowed.")
+        default:
+            return String(localized: "Check-in #\(count, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guests allowed.")
+        }
     }
 }
 
@@ -375,7 +387,6 @@ struct StatsBadge: View {
 enum CheckInStatus: Equatable {
     case waiting
     case recorded(invite: Invite, count: Int)
-    case maximumReached(invite: Invite)
     case failure(reason: String)
 }
 

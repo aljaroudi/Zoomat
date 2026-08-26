@@ -38,7 +38,7 @@ struct ContactDetailView: View {
                                 .foregroundStyle(.secondary)
 
                             if !invite.checkIns.isEmpty {
-                                Label("\(invite.checkIns.count) check-ins", systemImage: "checkmark.circle.fill")
+                                Label("\(invite.checkIns.count, format: .number) check-ins", systemImage: "checkmark.circle.fill")
                                     .font(.footnote)
                                     .foregroundStyle(.green)
                             }
@@ -100,7 +100,7 @@ struct CreateContactView: View {
                         Text("Add one name per line.")
 
                         if !validNames.isEmpty {
-                            Text("^[\(validNames.count) contact](inflect: true)")
+                            Text(validNamesCountText)
                         }
                     }
                 }
@@ -122,6 +122,14 @@ struct CreateContactView: View {
                 }
             }
             .saveErrorAlert(message: $errorMessage)
+        }
+    }
+
+    private var validNamesCountText: LocalizedStringResource {
+        if validNames.count == 1 {
+            "\(validNames.count, format: .number) contact"
+        } else {
+            "\(validNames.count, format: .number) contacts"
         }
     }
 

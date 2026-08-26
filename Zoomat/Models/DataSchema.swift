@@ -76,6 +76,9 @@ enum DataSchema: VersionedSchema {
         var latitude: Double?
         var longitude: Double?
 
+        // Guest allowance for named invitations
+        var defaultAdditionalGuestCount: Int = 0
+
         // Invitation Card Design
         @Attribute(.externalStorage) var imageData: Data?
         var qrPositionX: Double
@@ -85,7 +88,7 @@ enum DataSchema: VersionedSchema {
         @Relationship(deleteRule: .cascade, inverse: \Invite.event)
         var invites: [Invite]
 
-        init(title: String, subtitle: String = "", date: Date, expirationDate: Date? = nil, address: String? = nil, location: CLLocation? = nil, imageData: Data? = nil, qrPositionX: Double = 0.5, qrPositionY: Double = 0.5, qrSize: Double = 0.3) {
+        init(title: String, subtitle: String = "", date: Date, expirationDate: Date? = nil, address: String? = nil, location: CLLocation? = nil, defaultAdditionalGuestCount: Int = 0, imageData: Data? = nil, qrPositionX: Double = 0.5, qrPositionY: Double = 0.5, qrSize: Double = 0.3) {
             self.id = .init()
             self.created = .init()
             self.updated = .init()
@@ -96,6 +99,7 @@ enum DataSchema: VersionedSchema {
             self.address = address
             self.latitude = location?.coordinate.latitude
             self.longitude = location?.coordinate.longitude
+            self.defaultAdditionalGuestCount = defaultAdditionalGuestCount
             self.imageData = imageData
             self.qrPositionX = qrPositionX
             self.qrPositionY = qrPositionY
@@ -115,6 +119,7 @@ enum DataSchema: VersionedSchema {
                 expirationDate: expirationDate,
                 address: address,
                 location: latitude != nil && longitude != nil ? CLLocation(latitude: latitude!, longitude: longitude!) : nil,
+                defaultAdditionalGuestCount: defaultAdditionalGuestCount,
                 imageData: imageData,
                 qrPositionX: qrPositionX,
                 qrPositionY: qrPositionY,
@@ -150,25 +155,25 @@ enum DataSchema: VersionedSchema {
         // What
         var event: Event
 
-        // Check-in limits (nil = unlimited - backwards compatible)
-        var maxCheckIns: Int?
+        // nil inherits the event default. Ignored for blank invitations.
+        var additionalGuestCountOverride: Int?
 
         // How
         var qrToken: String { id.uuidString }
 
-        init(contact: Contact?, event: Event, contactName: String? = nil, maxCheckIns: Int? = nil) {
+        init(contact: Contact?, event: Event, contactName: String? = nil, additionalGuestCountOverride: Int? = nil) {
             self.id = .init()
             self.created = .init()
             self.contact = contact
             self.contactName = contactName ?? contact?.name
             self.checkIns = []
             self.event = event
-            self.maxCheckIns = maxCheckIns
+            self.additionalGuestCountOverride = additionalGuestCountOverride
         }
 
         // Convenience initializer for backwards compatibility
         convenience init(contact: Contact, event: Event) {
-            self.init(contact: contact, event: event, contactName: nil, maxCheckIns: nil)
+            self.init(contact: contact, event: event, contactName: nil, additionalGuestCountOverride: nil)
         }
 
         static var mock: Self {
@@ -179,9 +184,21 @@ enum DataSchema: VersionedSchema {
             contactName ?? "General Invite"
         }
 
-        var hasReachedLimit: Bool {
-            guard let maxCheckIns else { return false }
-            return checkIns.count >= maxCheckIns
+        var effectiveAdditionalGuestCount: Int? {
+            guard contact != nil || additionalGuestCountOverride != nil else { return nil }
+            return additionalGuestCountOverride ?? event.defaultAdditionalGuestCount
+        }
+
+        var additionalGuestAllowanceText: LocalizedStringResource? {
+            guard let effectiveAdditionalGuestCount else { return nil }
+            switch effectiveAdditionalGuestCount {
+            case 0:
+                return "No additional guests"
+            case 1:
+                return "\(effectiveAdditionalGuestCount, format: .number) additional guest"
+            default:
+                return "\(effectiveAdditionalGuestCount, format: .number) additional guests"
+            }
         }
 
         var checkInsNewestFirst: [CheckIn] {
@@ -189,16 +206,14 @@ enum DataSchema: VersionedSchema {
         }
 
         @discardableResult
-        func recordCheckIn(in context: ModelContext) throws -> CheckInResult {
-            guard !hasReachedLimit else { return .maximumReached }
-
+        func recordCheckIn(in context: ModelContext) throws -> Int {
             let newCount = checkIns.count + 1
             let checkIn = CheckIn(invite: self)
             context.insert(checkIn)
 
             do {
                 try context.save()
-                return .recorded(count: newCount)
+                return newCount
             } catch {
                 context.rollback()
                 throw error
@@ -215,11 +230,6 @@ enum DataSchema: VersionedSchema {
             }
         }
     }
-}
-
-enum CheckInResult: Equatable {
-    case recorded(count: Int)
-    case maximumReached
 }
 
 struct EventTimelinePartition {
