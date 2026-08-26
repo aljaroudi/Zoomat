@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 @preconcurrency import AVFoundation
 
 struct QRScannerView: View {
@@ -14,6 +15,9 @@ struct QRScannerView: View {
     @State private var scanner = QRScanner()
     @State private var checkInStatus: CheckInStatus = .waiting
     @State private var currentEventID: UUID?
+    @State private var showingScannerPassImporter = false
+    @State private var scannerPassAlertTitle = ""
+    @State private var scannerPassMessage: String?
 
     var body: some View {
         ZStack {
@@ -29,6 +33,12 @@ struct QRScannerView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Close") { dismiss() }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Import Scanner Pass", systemImage: "square.and.arrow.down") {
+                    scanner.stopScanning()
+                    showingScannerPassImporter = true
+                }
             }
         }
         .onAppear {
@@ -51,6 +61,23 @@ struct QRScannerView: View {
             case .waiting:
                 nil
             }
+        }
+        .fileImporter(
+            isPresented: $showingScannerPassImporter,
+            allowedContentTypes: [.zoomatScannerPass],
+            allowsMultipleSelection: false,
+            onCompletion: handleScannerPassSelection
+        )
+        .alert(
+            scannerPassAlertTitle,
+            isPresented: Binding(
+                get: { scannerPassMessage != nil },
+                set: { if !$0 { scannerPassMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(scannerPassMessage ?? "")
         }
     }
 
@@ -98,14 +125,14 @@ struct QRScannerView: View {
         case .recorded(let invite, let count):
             resultView(
                 invite: invite,
-                title: "Check-in #\(count) recorded",
+                title: "Check-in #\(count) recorded on this phone",
                 systemImage: "checkmark.circle.fill",
                 color: .green
             )
         case .maximumReached(let invite):
             resultView(
                 invite: invite,
-                title: "Maximum Reached",
+                title: "Maximum Reached on This Phone",
                 systemImage: "hand.raised.fill",
                 color: .red
             )
@@ -245,10 +272,16 @@ struct QRScannerView: View {
     }
 
     private func statsBar(stats: (invitations: Int, checkIns: Int, unused: Int)) -> some View {
-        HStack(spacing: 12) {
-            StatsBadge(label: "Invitations", value: stats.invitations, color: .blue)
-            StatsBadge(label: "Check-ins", value: stats.checkIns, color: .green)
-            StatsBadge(label: "Unused", value: stats.unused, color: .orange)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("On This Phone")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                StatsBadge(label: "Invitations", value: stats.invitations, color: .blue)
+                StatsBadge(label: "Check-ins", value: stats.checkIns, color: .green)
+                StatsBadge(label: "Unused", value: stats.unused, color: .orange)
+            }
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
@@ -275,14 +308,42 @@ struct QRScannerView: View {
                 checkInStatus = .recorded(invite: invite, count: count)
                 UIAccessibility.post(
                     notification: .announcement,
-                    argument: String(localized: "Check-in #\(count) recorded")
+                    argument: String(localized: "Check-in #\(count) recorded on this phone")
                 )
             case .maximumReached:
                 checkInStatus = .maximumReached(invite: invite)
-                UIAccessibility.post(notification: .announcement, argument: String(localized: "Maximum Reached"))
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: String(localized: "Maximum Reached on This Phone")
+                )
             }
         } catch {
             showFailure(error.localizedDescription)
+        }
+    }
+
+    private func handleScannerPassSelection(_ selection: Result<[URL], Error>) {
+        defer {
+            if case .waiting = checkInStatus {
+                scanner.startScanning()
+            }
+        }
+
+        do {
+            guard let url = try selection.get().first else { return }
+            let pass = try ScannerPass.read(from: url)
+            let result = try ScannerPassImporter.importPass(pass, into: modelContext)
+            currentEventID = pass.event.id
+            checkInStatus = .waiting
+            scannerPassAlertTitle = String(localized: "Scanner Pass Imported")
+            scannerPassMessage = String(
+                localized: "\(result.eventTitle) is ready with \(result.invitationCount) invitations. Counts and limits apply only to this phone."
+            )
+        } catch let error as CocoaError where error.code == .userCancelled {
+            return
+        } catch {
+            scannerPassAlertTitle = String(localized: "Couldn’t Import Scanner Pass")
+            scannerPassMessage = error.localizedDescription
         }
     }
 
