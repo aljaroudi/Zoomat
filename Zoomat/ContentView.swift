@@ -29,7 +29,7 @@ struct ContentView: View {
                 showingQRScanner = true
             } label: {
                 Image(systemName: "qrcode.viewfinder")
-                    .font(.title2)
+                    .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 60, height: 60)
                     .background(Color.accentColor)
@@ -37,9 +37,13 @@ struct ContentView: View {
                     .shadow(radius: 4)
             }
             .padding()
+            .accessibilityLabel("Scan Invitation")
+            .accessibilityHint("Opens the camera to record a check-in")
         }
-        .sheet(isPresented: $showingQRScanner) {
-            QRScannerView()
+        .fullScreenCover(isPresented: $showingQRScanner) {
+            NavigationStack {
+                QRScannerView()
+            }
         }
     }
 }

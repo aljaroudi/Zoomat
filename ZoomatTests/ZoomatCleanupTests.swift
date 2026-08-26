@@ -1,0 +1,201 @@
+import XCTest
+import SwiftData
+import UIKit
+@testable import Zoomat
+
+final class ZoomatCleanupTests: XCTestCase {
+    @MainActor
+    func testEventTimelineGroupsByDayAndOrdersUpcomingThenEnded() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 8, day: 26, hour: 12
+        )))
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
+
+        let events = [
+            Event(title: "Late tomorrow", date: tomorrow.addingTimeInterval(3_600)),
+            Event(title: "Yesterday", date: yesterday),
+            Event(title: "Soon", date: now.addingTimeInterval(600)),
+            Event(title: "Earlier today", date: now.addingTimeInterval(-600)),
+            Event(title: "Early tomorrow", date: tomorrow)
+        ]
+
+        let groups = EventTimeline.groups(for: events, now: now, calendar: calendar)
+
+        XCTAssertEqual(groups.map(\.day), [
+            calendar.startOfDay(for: now),
+            calendar.startOfDay(for: tomorrow),
+            calendar.startOfDay(for: yesterday)
+        ])
+        XCTAssertEqual(groups[0].events.map(\.title), ["Earlier today", "Soon"])
+        XCTAssertEqual(groups[1].events.map(\.title), ["Early tomorrow", "Late tomorrow"])
+    }
+
+    @MainActor
+    func testEventUsesExpirationInsteadOfStartDateForEndedState() {
+        let now = Date()
+        let running = Event(
+            title: "Running",
+            date: now.addingTimeInterval(-60),
+            expirationDate: now.addingTimeInterval(60)
+        )
+        let ended = Event(
+            title: "Ended",
+            date: now.addingTimeInterval(-120),
+            expirationDate: now.addingTimeInterval(-60)
+        )
+
+        XCTAssertFalse(running.isEnded(at: now))
+        XCTAssertTrue(ended.isEnded(at: now))
+    }
+
+    @MainActor
+    func testEventDraftDefaultsToOneHourDuration() {
+        let start = Date()
+        var draft = EventDraft()
+        draft.date = start
+
+        XCTAssertEqual(draft.duration, 3_600)
+        XCTAssertEqual(draft.expirationDate, start.addingTimeInterval(3_600))
+    }
+
+    @MainActor
+    func testDeletingDisplayedInvitationDeletesThatInstance() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let event = Event(title: "Event", date: .now)
+        let first = Invite(contact: nil, event: event, contactName: "First")
+        let displayed = Invite(contact: nil, event: event, contactName: "Displayed")
+        context.insert(event)
+        context.insert(first)
+        context.insert(displayed)
+        try context.save()
+
+        try displayed.deleteFromStore(in: context)
+
+        let remaining = try context.fetch(FetchDescriptor<Invite>())
+        XCTAssertEqual(remaining.map(\.id), [first.id])
+    }
+
+    @MainActor
+    func testRepeatedScansRecordEveryCheckIn() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let event = Event(title: "Event", date: .now)
+        let invite = Invite(contact: nil, event: event, maxCheckIns: nil)
+        context.insert(event)
+        context.insert(invite)
+        try context.save()
+
+        XCTAssertEqual(try invite.recordCheckIn(in: context), .recorded(count: 1))
+        XCTAssertEqual(try invite.recordCheckIn(in: context), .recorded(count: 2))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 2)
+    }
+
+    @MainActor
+    func testMaximumCheckInsStopsAdditionalRecord() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let event = Event(title: "Event", date: .now)
+        let invite = Invite(contact: nil, event: event, maxCheckIns: 1)
+        context.insert(event)
+        context.insert(invite)
+        try context.save()
+
+        XCTAssertEqual(try invite.recordCheckIn(in: context), .recorded(count: 1))
+        XCTAssertEqual(try invite.recordCheckIn(in: context), .maximumReached)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 1)
+    }
+
+    func testQRRectStaysInsideImageBounds() {
+        let imageSize = CGSize(width: 1_200, height: 800)
+
+        for point in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
+            let rect = qrRect(
+                in: imageSize,
+                positionX: point.0,
+                positionY: point.1,
+                sizeFraction: 0.4
+            )
+            XCTAssertGreaterThanOrEqual(rect.minX, 0)
+            XCTAssertGreaterThanOrEqual(rect.minY, 0)
+            XCTAssertLessThanOrEqual(rect.maxX, imageSize.width)
+            XCTAssertLessThanOrEqual(rect.maxY, imageSize.height)
+        }
+    }
+
+    @MainActor
+    func testInvitationOutputMatchesSourcePixelDimensions() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let source = UIGraphicsImageRenderer(
+            size: CGSize(width: 1_200, height: 800),
+            format: format
+        ).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1_200, height: 800))
+        }
+
+        let event = Event(title: "Event", date: .now, imageData: source.pngData())
+        let invite = Invite(contact: nil, event: event)
+        let output = try XCTUnwrap(invite.generateInvitationCard()?.cgImage)
+
+        XCTAssertEqual(output.width, 1_200)
+        XCTAssertEqual(output.height, 800)
+    }
+
+    @MainActor
+    func testStoreReopenPreservesLegacyDataAndRelationships() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storeURL = directory.appendingPathComponent("Legacy.store")
+        let schema = Schema(DataSchema.models)
+        let configuration = ModelConfiguration(schema: schema, url: storeURL)
+
+        do {
+            let container = try ModelContainer(for: schema, configurations: configuration)
+            let context = container.mainContext
+            let contact = Contact(name: "Legacy Contact")
+            let event = Event(
+                title: "Legacy Event",
+                date: .now,
+                expirationDate: Date.distantPast
+            )
+            let invite = Invite(contact: contact, event: event)
+            context.insert(contact)
+            context.insert(event)
+            context.insert(invite)
+            _ = try invite.recordCheckIn(in: context)
+        }
+
+        let reopened = try ModelContainer(for: schema, configurations: configuration)
+        let context = reopened.mainContext
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let contacts = try context.fetch(FetchDescriptor<Contact>())
+        let invites = try context.fetch(FetchDescriptor<Invite>())
+        let checkIns = try context.fetch(FetchDescriptor<CheckIn>())
+
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(contacts.count, 1)
+        XCTAssertEqual(invites.count, 1)
+        XCTAssertEqual(checkIns.count, 1)
+        XCTAssertEqual(events[0].expirationDate, Date.distantPast)
+        XCTAssertEqual(invites[0].contact?.name, "Legacy Contact")
+        XCTAssertEqual(checkIns[0].invite.id, invites[0].id)
+    }
+
+    @MainActor
+    private func makeInMemoryContainer() throws -> ModelContainer {
+        let schema = Schema(DataSchema.models)
+        return try ModelContainer(
+            for: schema,
+            configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        )
+    }
+}

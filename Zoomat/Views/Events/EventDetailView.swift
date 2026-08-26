@@ -13,9 +13,10 @@ struct EventDetailView: View {
     @Bindable var event: Event
     @State private var showingEditSheet = false
     @State private var showingAddInvites = false
-    @State private var showingDuplicateAlert = false
     @State private var showingCalendarEditor = false
     @State private var showingExportInvitations = false
+    @State private var inviteToDelete: Invite?
+    @State private var errorMessage: String?
 
     var body: some View {
         List {
@@ -74,6 +75,18 @@ struct EventDetailView: View {
         .navigationDestination(for: Invite.self) { invite in
             InviteDetailView(invite: invite)
         }
+        .confirmationDialog(
+            "Delete this invitation and all its check-ins?",
+            isPresented: Binding(
+                get: { inviteToDelete != nil },
+                set: { if !$0 { inviteToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Invitation", role: .destructive, action: deleteInvite)
+            Button("Cancel", role: .cancel) { inviteToDelete = nil }
+        }
+        .saveErrorAlert(message: $errorMessage)
     }
 
     private var imageSection: some View {
@@ -97,9 +110,19 @@ struct EventDetailView: View {
     private var detailsSection: some View {
         Section("Details") {
             LabeledContent("Date", value: event.date, format: .dateTime)
+            LabeledContent(
+                "Duration",
+                value: Duration.seconds(event.effectiveExpirationDate.timeIntervalSince(event.date)).formatted(
+                    .units(allowed: [.hours, .minutes], width: .wide)
+                )
+            )
+            LabeledContent("Expires", value: event.effectiveExpirationDate, format: .dateTime)
 
-            if let expirationDate = event.expirationDate {
-                LabeledContent("Expires", value: expirationDate, format: .dateTime)
+            if event.isEnded(at: .now) {
+                LabeledContent("Status") {
+                    Text("Ended")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if !event.subtitle.isEmpty {
@@ -113,59 +136,53 @@ struct EventDetailView: View {
     }
 
     private var invitesSection: some View {
-        Group {
-            let notCheckedIn = event.invites.filter { $0.checkIns.isEmpty }
-            Section {
-                ForEach(notCheckedIn) { invite in
-                    NavigationLink(value: invite) {
-                        InviteRowView(invite: invite)
+        Section {
+            ForEach(event.invites.sorted { $0.created < $1.created }) { invite in
+                NavigationLink(value: invite) {
+                    InviteRowView(invite: invite)
+                }
+                .swipeActions(allowsFullSwipe: false) {
+                    Button("Delete", role: .destructive) {
+                        inviteToDelete = invite
                     }
-                }
-                .onDelete(perform: deleteInvites)
-
-                Button {
-                    showingAddInvites = true
-                } label: {
-                    Label("Add Invites", systemImage: "person.badge.plus")
-                }
-            } header: {
-                HStack {
-                    Text("Invites")
-                    Spacer()
-                    Text(notCheckedIn.count, format: .number)
-                        .foregroundStyle(.secondary)
                 }
             }
 
-            let checkedIn = event.invites.filter { !$0.checkIns.isEmpty }
-            Section {
-                ForEach(checkedIn) { invite in
-                    NavigationLink(value: invite) {
-                        InviteRowView(invite: invite)
-                    }
-                }
-            } header: {
-                HStack {
-                    Text("Checked In")
-                    Spacer()
-                    Text(checkedIn.count, format: .number)
-                        .foregroundStyle(.secondary)
-                }
+            Button {
+                showingAddInvites = true
+            } label: {
+                Label("Add Invites", systemImage: "person.badge.plus")
+            }
+        } header: {
+            HStack {
+                Text("Invitations")
+                Spacer()
+                Text(event.invites.count, format: .number)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private func deleteInvites(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(event.invites[index])
+    private func deleteInvite() {
+        guard let inviteToDelete else { return }
+
+        do {
+            try inviteToDelete.deleteFromStore(in: modelContext)
+            self.inviteToDelete = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
-        try? modelContext.save()
     }
 
     private func duplicateEvent() {
         let duplicate = event.duplicate()
         modelContext.insert(duplicate)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -190,25 +207,23 @@ struct InviteRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // Show check-in limit badge if set
                 if let maxCheckIns = invite.maxCheckIns {
-                    HStack(spacing: 4) {
-                        Image(systemName: "number")
-                            .font(.caption2)
-                        Text("\(invite.checkIns.count)/\(maxCheckIns) check-ins")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(invite.hasReachedLimit ? .red : .blue)
+                    Text("\(invite.checkIns.count) of \(maxCheckIns) check-ins")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("\(invite.checkIns.count) check-ins")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             Spacer()
 
-            // Show limit reached indicator
             if invite.hasReachedLimit {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .font(.caption)
+                Text("Maximum reached")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }

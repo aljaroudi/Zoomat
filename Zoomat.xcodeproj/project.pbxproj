@@ -10,9 +10,20 @@
 		151C5D222EC3B21700C132EF /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 151C5D212EC3B21700C132EF /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AA00000B0000000000000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 151C5C532EC0809000C132EF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 151C5C5A2EC0809000C132EF;
+			remoteInfo = Zoomat;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		151C5C5B2EC0809000C132EF /* Zoomat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zoomat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		151C5D212EC3B21700C132EF /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		AA0000020000000000000000 /* ZoomatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZoomatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -34,10 +45,22 @@
 			path = Zoomat;
 			sourceTree = "<group>";
 		};
+		AA0000010000000000000000 /* ZoomatTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ZoomatTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		151C5C582EC0809000C132EF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0000050000000000000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -51,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				151C5C5D2EC0809000C132EF /* Zoomat */,
+				AA0000010000000000000000 /* ZoomatTests */,
 				151C5C5C2EC0809000C132EF /* Products */,
 				151C5D212EC3B21700C132EF /* AppIcon.icon */,
 			);
@@ -60,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				151C5C5B2EC0809000C132EF /* Zoomat.app */,
+				AA0000020000000000000000 /* ZoomatTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -89,6 +114,29 @@
 			productReference = 151C5C5B2EC0809000C132EF /* Zoomat.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA0000030000000000000000 /* ZoomatTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000070000000000000000 /* Build configuration list for PBXNativeTarget "ZoomatTests" */;
+			buildPhases = (
+				AA0000040000000000000000 /* Sources */,
+				AA0000050000000000000000 /* Frameworks */,
+				AA0000060000000000000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA00000A0000000000000000 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000010000000000000000 /* ZoomatTests */,
+			);
+			name = ZoomatTests;
+			packageProductDependencies = (
+			);
+			productName = ZoomatTests;
+			productReference = AA0000020000000000000000 /* ZoomatTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -101,6 +149,10 @@
 				TargetAttributes = {
 					151C5C5A2EC0809000C132EF = {
 						CreatedOnToolsVersion = 26.1;
+					};
+					AA0000030000000000000000 = {
+						CreatedOnToolsVersion = 26.1;
+						TestTargetID = 151C5C5A2EC0809000C132EF;
 					};
 				};
 			};
@@ -120,6 +172,7 @@
 			projectRoot = "";
 			targets = (
 				151C5C5A2EC0809000C132EF /* Zoomat */,
+				AA0000030000000000000000 /* ZoomatTests */,
 			);
 		};
 /* End PBXProject section */
@@ -133,6 +186,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000060000000000000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -143,7 +203,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000040000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA00000A0000000000000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 151C5C5A2EC0809000C132EF /* Zoomat */;
+			targetProxy = AA00000B0000000000000000 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		151C5C6A2EC0809100C132EF /* Debug */ = {
@@ -151,7 +226,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Zoomat/Zoomat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5VGKP2QV6H;
@@ -160,6 +234,7 @@
 				INFOPLIST_FILE = Zoomat/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSCalendarsWriteOnlyAccessUsageDescription = "Zoomat uses calendar access only when you choose to add an event.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan QR codes for check-ins";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Enable this if you'd like to import contacts from your phone.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -172,7 +247,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aljaroudi.Zoomat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -194,7 +269,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Zoomat/Zoomat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5VGKP2QV6H;
@@ -203,6 +277,7 @@
 				INFOPLIST_FILE = Zoomat/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSCalendarsWriteOnlyAccessUsageDescription = "Zoomat uses calendar access only when you choose to add an event.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan QR codes for check-ins";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Enable this if you'd like to import contacts from your phone.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -215,7 +290,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aljaroudi.Zoomat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -285,7 +360,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -344,7 +419,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -352,6 +427,52 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		AA0000080000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5VGKP2QV6H;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aljaroudi.ZoomatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Zoomat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Zoomat";
+			};
+			name = Debug;
+		};
+		AA0000090000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5VGKP2QV6H;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aljaroudi.ZoomatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Zoomat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Zoomat";
 			};
 			name = Release;
 		};
@@ -372,6 +493,15 @@
 			buildConfigurations = (
 				151C5C6A2EC0809100C132EF /* Debug */,
 				151C5C6B2EC0809100C132EF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0000070000000000000000 /* Build configuration list for PBXNativeTarget "ZoomatTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000080000000000000000 /* Debug */,
+				AA0000090000000000000000 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

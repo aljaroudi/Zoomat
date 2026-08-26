@@ -20,7 +20,7 @@ struct EventEditViewController: UIViewControllerRepresentable {
         // Pre-populate event details
         ekEvent.title = event.title
         ekEvent.startDate = event.date
-        ekEvent.endDate = event.expirationDate ?? event.date.addingTimeInterval(3600) // Default to 1 hour if no expiration
+        ekEvent.endDate = event.effectiveExpirationDate
         ekEvent.notes = event.subtitle.isEmpty ? nil : event.subtitle
         ekEvent.location = event.address
         
@@ -53,4 +53,3 @@ struct EventEditViewController: UIViewControllerRepresentable {
         }
     }
 }
-

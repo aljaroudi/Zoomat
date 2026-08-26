@@ -1,10 +1,10 @@
 # Privacy Policy for Zoomat
 
-**Last updated: November 11, 2025**
+**Last updated: August 26, 2026**
 
 ## Data Collection
 
-Zoomat does not collect, transmit, or store any personal data on external servers. All information remains exclusively on your device.
+Zoomat does not collect or transmit personal data to Zoomat-operated servers. Event, contact, invitation, and check-in information is stored locally on your device.
 
 ## Data Storage
 
@@ -17,10 +17,11 @@ The app requests the following permissions only when needed:
 
 - **Camera**: Required for QR code scanning at check-in
 - **Contacts**: Optional, only if you choose to import contacts
+- **Calendar**: Optional, only when you choose to add an event to Calendar
 
 ## Data Security
 
-Your data never leaves your device.
+Zoomat has no backend, analytics, or advertising SDK. Data leaves the app only when you explicitly choose a system destination, such as sharing prepared invitation images or adding an event to Calendar. Those destinations are governed by their own privacy practices.
 
 ## Data Deletion
 

@@ -9,7 +9,8 @@ struct ImportContactsView: View {
     @State private var deviceContacts: [CNContact] = []
     @State private var selectedContacts: Set<String> = []
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var accessErrorMessage: String?
+    @State private var saveErrorMessage: String?
     @State private var searchText = ""
     
     var filteredContacts: [CNContact] {
@@ -26,11 +27,11 @@ struct ImportContactsView: View {
             Group {
                 if isLoading {
                     ProgressView("Loading contacts...")
-                } else if let errorMessage {
+                } else if let accessErrorMessage {
                     ContentUnavailableView(
                         "Access Denied",
                         systemImage: "person.crop.circle.badge.exclamationmark",
-                        description: Text(errorMessage)
+                        description: Text(accessErrorMessage)
                     )
                 } else if deviceContacts.isEmpty {
                     ContentUnavailableView(
@@ -61,6 +62,7 @@ struct ImportContactsView: View {
             .task {
                 await loadContacts()
             }
+            .saveErrorAlert(message: $saveErrorMessage)
         }
     }
     
@@ -81,11 +83,11 @@ struct ImportContactsView: View {
         do {
             let granted = try await store.requestAccess(for: .contacts)
             guard granted else {
-                errorMessage = "Contact access is required to import contacts. Please enable it in Settings."
+                accessErrorMessage = "Contact access is required to import contacts. Please enable it in Settings."
                 return
             }
         } catch {
-            errorMessage = "Failed to access contacts: \(error.localizedDescription)"
+            accessErrorMessage = "Failed to access contacts: \(error.localizedDescription)"
             return
         }
         
@@ -108,7 +110,7 @@ struct ImportContactsView: View {
                 "\($0.givenName) \($0.familyName)" < "\($1.givenName) \($1.familyName)"
             }
         } catch {
-            errorMessage = "Failed to load contacts: \(error.localizedDescription)"
+            accessErrorMessage = "Failed to load contacts: \(error.localizedDescription)"
         }
     }
     
@@ -126,7 +128,13 @@ struct ImportContactsView: View {
             modelContext.insert(contact)
         }
         
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            saveErrorMessage = "Failed to import contacts: \(error.localizedDescription)"
+        }
     }
 }
 

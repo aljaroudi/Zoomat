@@ -58,13 +58,6 @@ enum DataSchema: VersionedSchema {
             .init(name: "John Doe", phone: "+1 123 456 789", email: "john@doe.com")
         }
 
-        static func loadMock(into context: ModelContext) {
-            let count = try? context.fetchCount(FetchDescriptor<Self>())
-            guard let count, count == 0 else { return }
-            let contact = Self.mock
-            context.insert(contact)
-            try? context.save()
-        }
     }
 
     @Model
@@ -114,14 +107,6 @@ enum DataSchema: VersionedSchema {
             .init(title: "Test Event", subtitle: "This is my event", date: .now, address: "123 Main St")
         }
 
-        static func loadMock(into context: ModelContext) {
-            let count = try? context.fetchCount(FetchDescriptor<Self>())
-            guard let count, count == 0 else { return }
-            let contact = Self.mock
-            context.insert(contact)
-            try? context.save()
-        }
-
         func duplicate() -> Event {
             Event(
                 title: "\(title) 2",
@@ -137,8 +122,12 @@ enum DataSchema: VersionedSchema {
             )
         }
 
-        var relativeDate: String {
-            Calendar.current.startOfDay(for: self.date).formatted(.relative(presentation: .named))
+        var effectiveExpirationDate: Date {
+            expirationDate ?? date.addingTimeInterval(3_600)
+        }
+
+        func isEnded(at now: Date) -> Bool {
+            effectiveExpirationDate < now
         }
     }
 
@@ -182,14 +171,6 @@ enum DataSchema: VersionedSchema {
             .init(contact: .mock, event: .mock)
         }
 
-        static func loadMock(into context: ModelContext) {
-            let count = try? context.fetchCount(FetchDescriptor<Self>())
-            guard let count, count == 0 else { return }
-            let contact = Self.mock
-            context.insert(contact)
-            try? context.save()
-        }
-
         var displayName: String {
             contactName ?? "General Invite"
         }
@@ -197,6 +178,70 @@ enum DataSchema: VersionedSchema {
         var hasReachedLimit: Bool {
             guard let maxCheckIns else { return false }
             return checkIns.count >= maxCheckIns
+        }
+
+        var checkInsNewestFirst: [CheckIn] {
+            checkIns.sorted { $0.created > $1.created }
+        }
+
+        @discardableResult
+        func recordCheckIn(in context: ModelContext) throws -> CheckInResult {
+            guard !hasReachedLimit else { return .maximumReached }
+
+            let newCount = checkIns.count + 1
+            let checkIn = CheckIn(invite: self)
+            context.insert(checkIn)
+
+            do {
+                try context.save()
+                return .recorded(count: newCount)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+
+        func deleteFromStore(in context: ModelContext) throws {
+            context.delete(self)
+            do {
+                try context.save()
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+}
+
+enum CheckInResult: Equatable {
+    case recorded(count: Int)
+    case maximumReached
+}
+
+struct EventDayGroup {
+    let day: Date
+    let events: [Event]
+}
+
+enum EventTimeline {
+    static func groups(
+        for events: [Event],
+        now: Date,
+        calendar: Calendar = .current
+    ) -> [EventDayGroup] {
+        let grouped = Dictionary(grouping: events) { calendar.startOfDay(for: $0.date) }
+        let today = calendar.startOfDay(for: now)
+        let upcomingDays = grouped.keys.filter { $0 >= today }.sorted()
+        let endedDays = grouped.keys.filter { $0 < today }.sorted(by: >)
+
+        return (upcomingDays + endedDays).map { day in
+            let dayEvents = grouped[day, default: []].sorted { first, second in
+                let firstEnded = first.isEnded(at: now)
+                let secondEnded = second.isEnded(at: now)
+                if firstEnded != secondEnded { return !firstEnded }
+                return firstEnded ? first.date > second.date : first.date < second.date
+            }
+            return EventDayGroup(day: day, events: dayEvents)
         }
     }
 }
@@ -218,7 +263,11 @@ extension ModelContext {
         insert(event)
         insert(invite)
 
-        try? save()
+        do {
+            try save()
+        } catch {
+            assertionFailure("Could not save preview data: \(error)")
+        }
     }
 }
 

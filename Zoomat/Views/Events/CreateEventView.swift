@@ -2,364 +2,297 @@
 //  CreateEventView.swift
 //  Zoomat
 //
-//  Created by Mohammed on 11/9/25.
-//
 
 import SwiftUI
 import SwiftData
 import PhotosUI
 
-enum EventDuration: String, CaseIterable, Identifiable {
-    case thirtyMinutes
-    case oneHour
-    case twoHours
-    case fourHours
-    case oneDay
-    case custom
+struct EventDraft {
+    var title = ""
+    var subtitle = ""
+    var date = Date()
+    var duration: TimeInterval = 3_600
+    var address = ""
+    var imageData: Data?
+    var qrPositionX = 0.5
+    var qrPositionY = 0.5
+    var qrSize = 0.3
 
-    var id: String { rawValue }
+    init() {}
 
-    var timeInterval: TimeInterval? {
-        switch self {
-        case .thirtyMinutes: return 30 * 60
-        case .oneHour: return 60 * 60
-        case .twoHours: return 2 * 60 * 60
-        case .fourHours: return 4 * 60 * 60
-        case .oneDay: return 24 * 60 * 60
-        case .custom: return nil
-        }
+    init(event: Event) {
+        title = event.title
+        subtitle = event.subtitle
+        date = event.date
+        duration = max(event.effectiveExpirationDate.timeIntervalSince(event.date), 900)
+        address = event.address ?? ""
+        imageData = event.imageData
+        qrPositionX = event.qrPositionX
+        qrPositionY = event.qrPositionY
+        qrSize = min(max(event.qrSize, 0.1), 0.9)
+        clampPosition()
     }
 
-    var displayText: LocalizedStringKey {
-        switch self {
-        case .thirtyMinutes: "^[\(30) minute](inflect: true)"
-        case .oneHour: "^[\(1) hour](inflect: true)"
-        case .twoHours: "^[\(2) hour](inflect: true)"
-        case .fourHours: "^[\(4) hour](inflect: true)"
-        case .oneDay: "^[\(1) day](inflect: true)"
-        case .custom: "Custom"
-        }
+    mutating func clampPosition() {
+        let halfSize = qrSize / 2
+        qrPositionX = min(max(qrPositionX, halfSize), 1 - halfSize)
+        qrPositionY = min(max(qrPositionY, halfSize), 1 - halfSize)
+    }
+
+    var expirationDate: Date {
+        date.addingTimeInterval(duration)
+    }
+
+    func apply(to event: Event) {
+        event.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        event.subtitle = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        event.date = date
+        event.expirationDate = expirationDate
+        event.address = address.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        event.imageData = imageData
+        event.qrPositionX = qrPositionX
+        event.qrPositionY = qrPositionY
+        event.qrSize = qrSize
+        event.updated = .now
     }
 }
 
 struct CreateEventView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-
-    @State private var title = ""
-    @State private var subtitle = ""
-    @State private var date = Date()
-    @State private var address = ""
-    @State private var hasExpiration = false
-    @State private var selectedDuration: EventDuration = .oneHour
-    @State private var customExpirationDate = Date()
-
-    @State private var selectedImage: PhotosPickerItem?
-    @State private var imageData: Data?
-    @State private var qrPositionX: Double = 0.5
-    @State private var qrPositionY: Double = 0.5
-    @State private var qrSize: Double = 0.3
+    @State private var draft = EventDraft()
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Event Details") {
-                    TextField("Title", text: $title)
-                    TextField("Subtitle (optional)", text: $subtitle)
-                    DatePicker("Date", selection: $date)
-                    TextField("Address (optional)", text: $address)
-                }
+            EventForm(draft: $draft, errorMessage: $errorMessage)
+                .navigationTitle("New Event")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", role: .cancel) { dismiss() }
+                    }
 
-                Section("Expiration") {
-                    Toggle("Set expiration", isOn: $hasExpiration)
-
-                    if hasExpiration {
-                        Picker("Duration", selection: $selectedDuration) {
-                            ForEach(EventDuration.allCases) { duration in
-                                Text(duration.displayText).tag(duration)
-                            }
-                        }
-
-                        if selectedDuration == .custom {
-                            DatePicker("Expires at", selection: $customExpirationDate, in: date...)
-                        }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Create", action: createEvent)
+                            .disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
-
-                Section("Invitation Card") {
-                    let currentImageData = imageData
-                    PhotosPicker(selection: $selectedImage, matching: .images) {
-                        if let currentImageData, let uiImage = UIImage(data: currentImageData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxHeight: 200)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            Label("Select Image (optional)", systemImage: "photo")
-                        }
-                    }
-                }
-
-                if imageData != nil {
-                    Section("QR Code Position") {
-                        VStack {
-                            if let imageData, let uiImage = UIImage(data: imageData) {
-                                TemplatePreview(
-                                    image: uiImage,
-                                    qrPositionX: qrPositionX,
-                                    qrPositionY: qrPositionY,
-                                    qrSize: qrSize
-                                )
-                                .frame(height: 300)
-                                .background(Color(.systemGray6))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Horizontal Position: \(qrPositionX, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: $qrPositionX, in: 0...1)
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Vertical Position: \(qrPositionY, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: $qrPositionY, in: 0...1)
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Size: \(qrSize, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: $qrSize, in: 0.1...1.0)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("New Event")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        createEvent()
-                    }
-                    .disabled(title.isEmpty)
-                }
-            }
-            .onChange(of: selectedImage) { _, newValue in
-                Task {
-                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                        imageData = data
-                    }
-                }
-            }
+                .saveErrorAlert(message: $errorMessage)
         }
     }
 
     private func createEvent() {
-        let expirationDate: Date? = if hasExpiration {
-            if selectedDuration == .custom {
-                customExpirationDate
-            } else if let interval = selectedDuration.timeInterval {
-                date.addingTimeInterval(interval)
-            } else {
-                nil
-            }
-        } else {
-            nil
-        }
-
-        let event = Event(
-            title: title,
-            subtitle: subtitle,
-            date: date,
-            expirationDate: expirationDate,
-            address: address.isEmpty ? nil : address,
-            imageData: imageData,
-            qrPositionX: qrPositionX,
-            qrPositionY: qrPositionY,
-            qrSize: qrSize
-        )
+        let event = Event(title: draft.title, date: draft.date)
+        draft.apply(to: event)
         modelContext.insert(event)
-        try? modelContext.save()
-        dismiss()
+
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
 struct EditEventView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    let event: Event
 
-    @Bindable var event: Event
-    @State private var selectedImage: PhotosPickerItem?
-    @State private var newImageData: Data?
-    @State private var hasExpiration: Bool
-    @State private var selectedDuration: EventDuration = .oneHour
-    @State private var customExpirationDate: Date
+    @State private var draft: EventDraft
+    @State private var errorMessage: String?
+    @State private var showingDeleteConfirmation = false
 
     init(event: Event) {
         self.event = event
-        _hasExpiration = State(initialValue: event.expirationDate != nil)
-        _customExpirationDate = State(initialValue: event.expirationDate ?? Date())
-
-        // Determine initial duration
-        if let expiration = event.expirationDate {
-            let duration = expiration.timeIntervalSince(event.date)
-            if let matchingDuration = EventDuration.allCases.first(where: { $0.timeInterval == duration }) {
-                _selectedDuration = State(initialValue: matchingDuration)
-            } else {
-                _selectedDuration = State(initialValue: .custom)
-            }
-        }
-    }
-
-    var displayImageData: Data? {
-        newImageData ?? event.imageData
+        _draft = State(initialValue: EventDraft(event: event))
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Event Details") {
-                    TextField("Title", text: $event.title)
-                    TextField("Subtitle", text: $event.subtitle)
-                    DatePicker("Date", selection: $event.date)
-                    TextField("Address (optional)", text: Binding(
-                        get: { event.address ?? "" },
-                        set: { event.address = $0.isEmpty ? nil : $0 }
-                    ))
-                }
-
-                Section("Expiration") {
-                    Toggle("Set expiration", isOn: $hasExpiration)
-
-                    if hasExpiration {
-                        Picker("Duration", selection: $selectedDuration) {
-                            ForEach(EventDuration.allCases) { duration in
-                                Text(duration.displayText).tag(duration)
-                            }
-                        }
-
-                        if selectedDuration == .custom {
-                            DatePicker("Expires at", selection: $customExpirationDate, in: event.date...)
-                        }
-                    }
-                }
-
-                Section("Invitation Card") {
-                    let currentDisplayImageData = displayImageData
-                    PhotosPicker(selection: $selectedImage, matching: .images) {
-                        if let currentDisplayImageData, let uiImage = UIImage(data: currentDisplayImageData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxHeight: 200)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            Label("Select Image (optional)", systemImage: "photo")
-                        }
-                    }
-
-                    if displayImageData != nil {
-                        Button("Remove Image", role: .destructive) {
-                            newImageData = Data() // Empty data to signal removal
-                        }
-                    }
-                }
-
-                if displayImageData != nil && !displayImageData!.isEmpty {
-                    Section("QR Code Position") {
-                        VStack {
-                            if let uiImage = UIImage(data: displayImageData!) {
-                                TemplatePreview(
-                                    image: uiImage,
-                                    qrPositionX: event.qrPositionX,
-                                    qrPositionY: event.qrPositionY,
-                                    qrSize: event.qrSize
-                                )
-                                .frame(height: 300)
-                                .background(Color(.systemGray6))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Horizontal Position: \(event.qrPositionX, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: $event.qrPositionX, in: 0...1)
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Vertical Position: \(event.qrPositionY, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: $event.qrPositionY, in: 0...1)
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Size: \(event.qrSize, format: .percent.precision(.fractionLength(0)))")
-                                .font(.caption)
-                            Slider(value: $event.qrSize, in: 0.1...1.0)
-                        }
-                    }
-                }
-
+            EventForm(draft: $draft, errorMessage: $errorMessage) {
                 Section {
                     Button("Delete Event", role: .destructive) {
-                        deleteEvent()
+                        showingDeleteConfirmation = true
                     }
                 }
             }
             .navigationTitle("Edit Event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        saveChanges()
-                    }
+                    Button("Done", action: saveChanges)
+                        .disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .onChange(of: selectedImage) { _, newValue in
-                Task {
-                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                        newImageData = data
-                    }
-                }
+            .confirmationDialog(
+                "Delete this event and all its invitations and check-ins?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Event", role: .destructive, action: deleteEvent)
+                Button("Cancel", role: .cancel) {}
             }
+            .saveErrorAlert(message: $errorMessage)
         }
     }
 
     private func saveChanges() {
-        if let newImageData {
-            event.imageData = newImageData.isEmpty ? nil : newImageData
-        }
+        draft.apply(to: event)
 
-        event.expirationDate = if hasExpiration {
-            if selectedDuration == .custom {
-                customExpirationDate
-            } else if let interval = selectedDuration.timeInterval {
-                event.date.addingTimeInterval(interval)
-            } else {
-                nil
-            }
-        } else {
-            nil
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
-
-        event.updated = Date()
-        try? modelContext.save()
-        dismiss()
     }
 
     private func deleteEvent() {
         modelContext.delete(event)
-        dismiss()
+
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct EventForm<Footer: View>: View {
+    @Binding var draft: EventDraft
+    @Binding var errorMessage: String?
+    @State private var selectedImage: PhotosPickerItem?
+    @ViewBuilder let footer: () -> Footer
+
+    init(
+        draft: Binding<EventDraft>,
+        errorMessage: Binding<String?>,
+        @ViewBuilder footer: @escaping () -> Footer
+    ) {
+        _draft = draft
+        _errorMessage = errorMessage
+        self.footer = footer
+    }
+
+    var body: some View {
+        Form {
+            Section("Event Details") {
+                TextField("Title", text: $draft.title)
+                TextField("Subtitle (optional)", text: $draft.subtitle)
+                DatePicker("Date", selection: $draft.date)
+                Stepper(value: $draft.duration, in: 900...Double(Int.max), step: 900) {
+                    LabeledContent(
+                        "Duration",
+                        value: Duration.seconds(draft.duration).formatted(
+                            .units(allowed: [.hours, .minutes], width: .wide)
+                        )
+                    )
+                }
+                LabeledContent("Expires", value: draft.expirationDate, format: .dateTime)
+                TextField("Address (optional)", text: $draft.address)
+            }
+
+            Section("Invitation Card") {
+                let currentImageData = draft.imageData
+                PhotosPicker(selection: $selectedImage, matching: .images) {
+                    if let currentImageData, let image = UIImage(data: currentImageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Label("Select Image (optional)", systemImage: "photo")
+                    }
+                }
+
+                if draft.imageData != nil {
+                    Button("Remove Image", role: .destructive) {
+                        selectedImage = nil
+                        draft.imageData = nil
+                    }
+                }
+            }
+
+            if let imageData = draft.imageData, let image = UIImage(data: imageData) {
+                qrSection(image: image)
+            }
+
+            footer()
+        }
+        .onChange(of: selectedImage) { _, item in
+            Task {
+                guard let item else { return }
+                do {
+                    draft.imageData = try await item.loadTransferable(type: Data.self)
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func qrSection(image: UIImage) -> some View {
+        Section("QR Code Position") {
+            TemplatePreview(
+                image: image,
+                qrPositionX: draft.qrPositionX,
+                qrPositionY: draft.qrPositionY,
+                qrSize: draft.qrSize
+            )
+            .frame(height: 300)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            LabeledContent("Horizontal Position") {
+                Slider(value: positionBinding(for: \.qrPositionX), in: positionRange)
+                    .accessibilityLabel("Horizontal Position")
+                    .accessibilityValue(Text(draft.qrPositionX, format: .percent.precision(.fractionLength(0))))
+            }
+
+            LabeledContent("Vertical Position") {
+                Slider(value: positionBinding(for: \.qrPositionY), in: positionRange)
+                    .accessibilityLabel("Vertical Position")
+                    .accessibilityValue(Text(draft.qrPositionY, format: .percent.precision(.fractionLength(0))))
+            }
+
+            LabeledContent("Size") {
+                Slider(value: $draft.qrSize, in: 0.1...0.9) {
+                    Text("Size")
+                }
+                .accessibilityValue(Text(draft.qrSize, format: .percent.precision(.fractionLength(0))))
+                .onChange(of: draft.qrSize) { _, _ in draft.clampPosition() }
+            }
+        }
+    }
+
+    private var positionRange: ClosedRange<Double> {
+        let halfSize = draft.qrSize / 2
+        return halfSize...(1 - halfSize)
+    }
+
+    private func positionBinding(for keyPath: WritableKeyPath<EventDraft, Double>) -> Binding<Double> {
+        Binding(
+            get: { draft[keyPath: keyPath] },
+            set: { draft[keyPath: keyPath] = $0 }
+        )
+    }
+}
+
+private extension EventForm where Footer == EmptyView {
+    init(draft: Binding<EventDraft>, errorMessage: Binding<String?>) {
+        self.init(draft: draft, errorMessage: errorMessage) { EmptyView() }
     }
 }
 
@@ -371,44 +304,46 @@ struct TemplatePreview: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let imageSize = image.size
-            let scale = min(geometry.size.width / imageSize.width, geometry.size.height / imageSize.height)
-            let scaledWidth = imageSize.width * scale
-            let scaledHeight = imageSize.height * scale
-
-            // Calculate offset to center the image
-            let offsetX = (geometry.size.width - scaledWidth) / 2
-            let offsetY = (geometry.size.height - scaledHeight) / 2
-
-            // Calculate QR size based on smallest dimension
-            let minDimension = min(scaledWidth, scaledHeight)
-            let qrPixelSize = minDimension * qrSize
+            let scale = min(
+                geometry.size.width / image.size.width,
+                geometry.size.height / image.size.height
+            )
+            let imageSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let imageOffset = CGPoint(
+                x: (geometry.size.width - imageSize.width) / 2,
+                y: (geometry.size.height - imageSize.height) / 2
+            )
+            let rect = qrRect(
+                in: imageSize,
+                positionX: qrPositionX,
+                positionY: qrPositionY,
+                sizeFraction: qrSize
+            )
 
             ZStack(alignment: .topLeading) {
-                // Image
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: scaledWidth, height: scaledHeight)
-                    .offset(x: offsetX, y: offsetY)
+                    .frame(width: imageSize.width, height: imageSize.height)
+                    .offset(x: imageOffset.x, y: imageOffset.y)
 
-                // QR code placeholder
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.black.opacity(0.3))
+                    .fill(.black.opacity(0.35))
                     .overlay {
                         Image(systemName: "qrcode")
-                            .font(.system(size: qrPixelSize * 0.3))
+                            .font(.system(size: rect.width * 0.3))
                             .foregroundStyle(.white)
                     }
-                    .frame(width: qrPixelSize, height: qrPixelSize)
-                    .offset(
-                        x: offsetX + (scaledWidth * qrPositionX) - (qrPixelSize / 2),
-                        y: offsetY + (scaledHeight * qrPositionY) - (qrPixelSize / 2)
-                    )
+                    .frame(width: rect.width, height: rect.height)
+                    .offset(x: imageOffset.x + rect.minX, y: imageOffset.y + rect.minY)
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         }
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 #Preview("Create") {
@@ -418,7 +353,7 @@ struct TemplatePreview: View {
 
 #Preview("Edit") {
     @Previewable let container = previewContainer
-    @Previewable let event: Event = Event.mock
+    @Previewable let event = Event.mock
 
     EditEventView(event: event)
         .modelContainer(container)

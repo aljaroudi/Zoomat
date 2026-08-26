@@ -9,10 +9,19 @@ import SwiftUI
 
 struct EventRowView: View {
     let event: Event
+    var now = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(event.title)
+            HStack(alignment: .firstTextBaseline) {
+                Text(event.title)
+                Spacer()
+                if event.isEnded(at: now) {
+                    Text("Ended")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             HStack(spacing: 10) {
                 Label {
@@ -22,8 +31,8 @@ struct EventRowView: View {
                 }
 
                 Label {
-                    let checkedIn = event.invites.filter { !$0.checkIns.isEmpty }.count
-                    Text(checkedIn, format: .number)
+                    let checkIns = event.invites.reduce(0) { $0 + $1.checkIns.count }
+                    Text(checkIns, format: .number)
                 } icon: {
                     Image(systemName: "checkmark.circle")
                 }
