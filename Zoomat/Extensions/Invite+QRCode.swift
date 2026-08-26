@@ -30,6 +30,22 @@ nonisolated func qrRect(
     )
 }
 
+nonisolated func normalizedQRPosition(
+    in imageSize: CGSize,
+    at point: CGPoint,
+    sizeFraction: Double
+) -> CGPoint {
+    guard imageSize.width > 0, imageSize.height > 0 else {
+        return CGPoint(x: 0.5, y: 0.5)
+    }
+
+    let side = min(imageSize.width, imageSize.height) * min(max(sizeFraction, 0.1), 1)
+    let centerX = min(max(point.x, side / 2), imageSize.width - side / 2)
+    let centerY = min(max(point.y, side / 2), imageSize.height - side / 2)
+
+    return CGPoint(x: centerX / imageSize.width, y: centerY / imageSize.height)
+}
+
 extension Invite {
     /// Generates a QR code image for this invite
     private func generateQRCode(size: CGSize = CGSize(width: 512, height: 512)) -> UIImage? {

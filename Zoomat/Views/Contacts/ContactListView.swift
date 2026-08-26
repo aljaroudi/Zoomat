@@ -23,9 +23,9 @@ struct ContactListView: View {
             return contacts
         }
         return contacts.filter { contact in
-            contact.name.localizedCaseInsensitiveContains(searchText) ||
-            contact.email?.localizedCaseInsensitiveContains(searchText) == true ||
-            contact.phone?.localizedCaseInsensitiveContains(searchText) == true
+            contact.name.localizedStandardContains(searchText) ||
+            contact.email?.localizedStandardContains(searchText) == true ||
+            contact.phone?.localizedStandardContains(searchText) == true
         }
     }
 
@@ -34,6 +34,8 @@ struct ContactListView: View {
             Group {
                 if contacts.isEmpty {
                     emptyState
+                } else if filteredContacts.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else {
                     contactList
                 }
@@ -55,7 +57,7 @@ struct ContactListView: View {
                             Label("Import from Contacts", systemImage: "square.and.arrow.down")
                         }
                     } label: {
-                        Image(systemName: "plus")
+                        Label("Add Contacts", systemImage: "plus")
                     }
                 }
             }
@@ -136,23 +138,24 @@ struct ContactRowView: View {
 
             if let email = contact.email {
                 Text(email)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             if let phone = contact.phone {
                 Text(phone)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             if !contact.invites.isEmpty {
-                Text("^[\(contact.invites.count) invite](inflect: true)")
-                    .font(.caption2)
-                    .foregroundStyle(.blue)
+                Label("^[\(contact.invites.count) invite](inflect: true)", systemImage: "ticket")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
     }
 }
 

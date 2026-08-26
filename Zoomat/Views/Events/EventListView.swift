@@ -9,9 +9,14 @@ import SwiftData
 struct EventListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var events: [Event]
+    @Binding private var showingQRScanner: Bool
     @State private var showingCreateEvent = false
     @State private var eventToDelete: Event?
     @State private var errorMessage: String?
+
+    init(showingQRScanner: Binding<Bool> = .constant(false)) {
+        _showingQRScanner = showingQRScanner
+    }
 
     var body: some View {
         NavigationStack {
@@ -30,12 +35,15 @@ struct EventListView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingCreateEvent = true
-                    } label: {
-                        Image(systemName: "plus")
+                    Button("Scan Invitation", systemImage: "qrcode.viewfinder") {
+                        showingQRScanner = true
                     }
-                    .accessibilityLabel("Create Event")
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Create Event", systemImage: "plus") {
+                        showingCreateEvent = true
+                    }
                 }
             }
             .sheet(isPresented: $showingCreateEvent) {
@@ -68,23 +76,36 @@ struct EventListView: View {
     }
 
     private func eventList(now: Date) -> some View {
-        List {
-            ForEach(EventTimeline.groups(for: events, now: now), id: \.day) { group in
-                Section(group.day.formatted(.dateTime.weekday(.wide).month(.wide).day())) {
-                    ForEach(group.events) { event in
-                        NavigationLink(value: event) {
-                            EventRowView(event: event, now: now)
-                        }
-                        .swipeActions(allowsFullSwipe: false) {
-                            Button("Delete", role: .destructive) {
-                                eventToDelete = event
-                            }
-                        }
+        let timeline = EventTimeline.partition(events, at: now)
+
+        return List {
+            ForEach(timeline.currentAndUpcoming) { event in
+                eventLink(event, now: now)
+            }
+
+            if !timeline.past.isEmpty {
+                Section {
+                    ForEach(timeline.past) { event in
+                        eventLink(event, now: now)
                     }
+                } header: {
+                    Text("Past Events")
+                        .accessibilityAddTraits(.isHeader)
                 }
             }
         }
-        .listStyle(.grouped)
+        .listStyle(.plain)
+    }
+
+    private func eventLink(_ event: Event, now: Date) -> some View {
+        NavigationLink(value: event) {
+            EventRowView(event: event, now: now)
+        }
+        .swipeActions(allowsFullSwipe: false) {
+            Button("Delete", role: .destructive) {
+                eventToDelete = event
+            }
+        }
     }
 
     private func deleteEvent() {

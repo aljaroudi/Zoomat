@@ -18,7 +18,7 @@ struct ImportContactsView: View {
             return deviceContacts
         }
         return deviceContacts.filter { contact in
-            "\(contact.givenName) \(contact.familyName)".localizedCaseInsensitiveContains(searchText)
+            "\(contact.givenName) \(contact.familyName)".localizedStandardContains(searchText)
         }
     }
     
@@ -38,6 +38,8 @@ struct ImportContactsView: View {
                         "No Contacts Found",
                         systemImage: "person.crop.circle"
                     )
+                } else if filteredContacts.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else {
                     contactsList
                 }
@@ -67,10 +69,22 @@ struct ImportContactsView: View {
     }
     
     private var contactsList: some View {
-        List(filteredContacts, id: \.identifier, selection: $selectedContacts) { contact in
-            DeviceContactRow(contact: contact)
+        List(filteredContacts, id: \.identifier) { contact in
+            let isSelected = selectedContacts.contains(contact.identifier)
+
+            Button {
+                if isSelected {
+                    selectedContacts.remove(contact.identifier)
+                } else {
+                    selectedContacts.insert(contact.identifier)
+                }
+            } label: {
+                DeviceContactRow(contact: contact, isSelected: isSelected)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Double-tap to select or deselect this contact")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
         }
-        .environment(\.editMode, .constant(.active))
     }
     
     private func loadContacts() async {
@@ -140,25 +154,34 @@ struct ImportContactsView: View {
 
 struct DeviceContactRow: View {
     let contact: CNContact
+    let isSelected: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(contact.givenName) \(contact.familyName)")
-                .font(.headline)
-            
-            if let email = contact.emailAddresses.first?.value as String? {
-                Text(email)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(contact.givenName) \(contact.familyName)")
+                    .font(.headline)
+
+                if let email = contact.emailAddresses.first?.value as String? {
+                    Text(email)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let phone = contact.phoneNumbers.first?.value.stringValue {
+                    Text(phone)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
-            
-            if let phone = contact.phoneNumbers.first?.value.stringValue {
-                Text(phone)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+
+            Spacer()
+
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isSelected ? .orange : .secondary)
+                .font(.title3)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 

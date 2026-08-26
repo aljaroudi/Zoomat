@@ -34,9 +34,22 @@ struct QRScannerView: View {
         .onAppear {
             scanner.onCodeScanned = handleScannedCode
         }
+        .onDisappear {
+            scanner.deactivate()
+        }
         .onChange(of: checkInStatus) { _, status in
             if case .waiting = status {
                 scanner.startScanning()
+            }
+        }
+        .sensoryFeedback(trigger: checkInStatus) { _, status in
+            switch status {
+            case .recorded:
+                .success
+            case .maximumReached, .failure:
+                .error
+            case .waiting:
+                nil
             }
         }
     }
@@ -111,7 +124,8 @@ struct QRScannerView: View {
             }
 
             Image(systemName: "qrcode.viewfinder")
-                .font(.system(size: 60))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(.white)
                 .accessibilityHidden(true)
 
@@ -142,7 +156,8 @@ struct QRScannerView: View {
                 .padding(.horizontal)
 
             Image(systemName: systemImage)
-                .font(.system(size: 80))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(.white)
                 .accessibilityHidden(true)
 
@@ -172,7 +187,8 @@ struct QRScannerView: View {
             Spacer()
 
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 80))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(.white)
                 .accessibilityHidden(true)
 
@@ -203,7 +219,7 @@ struct QRScannerView: View {
         .frame(maxWidth: .infinity)
         .padding()
         .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(.rect(cornerRadius: 12))
     }
 
     private func cameraMessage(
@@ -237,7 +253,7 @@ struct QRScannerView: View {
         .padding(.horizontal)
         .padding(.vertical, 12)
         .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(.rect(cornerRadius: 16))
     }
 
     private func handleScannedCode(_ code: String) {
@@ -256,14 +272,12 @@ struct QRScannerView: View {
             currentEventID = invite.event.id
             switch try invite.recordCheckIn(in: modelContext) {
             case .recorded(let count):
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 checkInStatus = .recorded(invite: invite, count: count)
                 UIAccessibility.post(
                     notification: .announcement,
                     argument: String(localized: "Check-in #\(count) recorded")
                 )
             case .maximumReached:
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
                 checkInStatus = .maximumReached(invite: invite)
                 UIAccessibility.post(notification: .announcement, argument: String(localized: "Maximum Reached"))
             }
@@ -273,7 +287,6 @@ struct QRScannerView: View {
     }
 
     private func showFailure(_ reason: String) {
-        UINotificationFeedbackGenerator().notificationOccurred(.error)
         checkInStatus = .failure(reason: reason)
         UIAccessibility.post(notification: .announcement, argument: reason)
     }
@@ -290,7 +303,7 @@ struct StatsBadge: View {
                 .font(.title2.bold())
                 .foregroundStyle(color)
             Text(label)
-                .font(.caption2)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -328,22 +341,25 @@ struct QRScannerCameraView: UIViewRepresentable {
     }
 
     func dismantleUIView(_ uiView: UIView, coordinator: ()) {
-        scanner.stopScanning()
+        scanner.deactivate()
     }
 }
 
 @Observable
+@MainActor
 final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     private let sessionQueue = DispatchQueue(label: "com.zooma.qr-scanner")
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private weak var previewView: UIView?
     private var isProcessing = false
+    private var isActive = true
 
     private(set) var cameraState: CameraState = .loading
     var onCodeScanned: ((String) -> Void)?
 
     func setupCamera(on view: UIView) {
+        guard isActive else { return }
         previewView = view
         cameraState = .loading
 
@@ -353,7 +369,7 @@ final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self, weak view] granted in
                 DispatchQueue.main.async {
-                    guard let self, let view else { return }
+                    guard let self, let view, self.isActive else { return }
                     granted ? self.configureCamera(on: view) : (self.cameraState = .denied)
                 }
             }
@@ -366,6 +382,7 @@ final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
 
     func retryCameraSetup() {
         guard let previewView else { return }
+        isActive = true
         stopScanning()
         captureSession = nil
         previewLayer?.removeFromSuperlayer()
@@ -374,6 +391,7 @@ final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     private func configureCamera(on view: UIView) {
+        guard isActive else { return }
         guard let device = AVCaptureDevice.default(for: .video) else {
             cameraState = .unavailable
             return
@@ -413,7 +431,7 @@ final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     func startScanning() {
-        guard cameraState == .ready, let session = captureSession else { return }
+        guard isActive, cameraState == .ready, let session = captureSession else { return }
         isProcessing = false
         sessionQueue.async {
             if !session.isRunning { session.startRunning() }
@@ -427,15 +445,31 @@ final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         }
     }
 
-    func metadataOutput(
+    func deactivate() {
+        guard isActive else { return }
+        isActive = false
+        onCodeScanned = nil
+        stopScanning()
+        previewLayer?.removeFromSuperlayer()
+        previewLayer = nil
+        previewView = nil
+    }
+
+    nonisolated func metadataOutput(
         _ output: AVCaptureMetadataOutput,
         didOutput metadataObjects: [AVMetadataObject],
         from connection: AVCaptureConnection
     ) {
-        guard !isProcessing,
-              let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+        guard let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
               let value = object.stringValue else { return }
 
+        Task { @MainActor [weak self] in
+            self?.processScannedValue(value)
+        }
+    }
+
+    private func processScannedValue(_ value: String) {
+        guard isActive, !isProcessing else { return }
         isProcessing = true
         stopScanning()
         onCodeScanned?(value)

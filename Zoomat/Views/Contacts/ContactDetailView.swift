@@ -34,12 +34,12 @@ struct ContactDetailView: View {
                             Text(invite.event.title)
                                 .font(.headline)
                             Text(invite.event.date.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
 
                             if !invite.checkIns.isEmpty {
                                 Label("\(invite.checkIns.count) check-ins", systemImage: "checkmark.circle.fill")
-                                    .font(.caption2)
+                                    .font(.footnote)
                                     .foregroundStyle(.green)
                             }
                         }
@@ -88,28 +88,22 @@ struct CreateContactView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Enter names (one per line)")
-                    .font(.headline)
-                    .padding(.horizontal)
-                    .padding(.top)
+            Form {
+                Section {
+                    TextField("Names", text: $namesText, axis: .vertical)
+                        .lineLimit(6...12)
+                        .textInputAutocapitalization(.words)
+                } header: {
+                    Text("Enter names")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Add one name per line.")
 
-                TextEditor(text: $namesText)
-                    .font(.body)
-                    .autocapitalization(.words)
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal)
-
-                if !validNames.isEmpty {
-                    Text("^[\(validNames.count) contact](inflect: true)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
+                        if !validNames.isEmpty {
+                            Text("^[\(validNames.count) contact](inflect: true)")
+                        }
+                    }
                 }
-
-                Spacer()
             }
             .navigationTitle("New Contacts")
             .navigationBarTitleDisplayMode(.inline)
@@ -172,7 +166,7 @@ struct EditContactView: View {
                     TextField("Email (optional)", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
-                    .autocapitalization(.none)
+                    .textInputAutocapitalization(.never)
                     TextField("Phone (optional)", text: $phone)
                     .textContentType(.telephoneNumber)
                     .keyboardType(.phonePad)
