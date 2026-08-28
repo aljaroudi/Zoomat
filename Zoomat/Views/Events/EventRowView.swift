@@ -64,7 +64,7 @@ struct EventRowView: View {
 
             HStack(spacing: 16) {
                 Label(invitationCountText, systemImage: "person.2")
-                Label(checkInCountText, systemImage: "checkmark.circle")
+                Label(entryCountText, systemImage: "checkmark.circle")
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -85,11 +85,11 @@ struct EventRowView: View {
         }
     }
 
-    private var checkInCountText: LocalizedStringResource {
+    private var entryCountText: LocalizedStringResource {
         if checkInCount == 1 {
-            "\(checkInCount, format: .number) check-in"
+            "\(checkInCount, format: .number) entry used"
         } else {
-            "\(checkInCount, format: .number) check-ins"
+            "\(checkInCount, format: .number) entries used"
         }
     }
 }

@@ -113,14 +113,15 @@ extension Invite {
         }
 
         // Create metadata dictionary
+        let caption = "\(displayName) — \(event.title)"
         let metadata: [String: Any] = [
             kCGImagePropertyIPTCDictionary as String: [
-                kCGImagePropertyIPTCCaptionAbstract as String: displayName,
-                kCGImagePropertyIPTCKeywords as String: [event.title, "Zoomat Invitation"],
+                kCGImagePropertyIPTCCaptionAbstract as String: caption,
+                kCGImagePropertyIPTCKeywords as String: [displayName, event.title, "Zoomat Invitation"],
                 kCGImagePropertyIPTCCreatorContactInfo as String: "Zoomat"
             ],
             kCGImagePropertyExifDictionary as String: [
-                kCGImagePropertyExifUserComment as String: "Invitation for \(displayName) - \(event.title)"
+                kCGImagePropertyExifUserComment as String: caption
             ]
         ]
 

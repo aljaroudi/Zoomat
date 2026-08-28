@@ -129,7 +129,7 @@ struct QRScannerView: View {
         case .recorded(let result):
             resultView(
                 result: result,
-                title: "Check-in #\(result.checkInCount, format: .number) recorded on this phone",
+                title: "Entry \(result.checkInCount, format: .number) of \(result.allowedEntryCount, format: .number) recorded on this phone",
                 systemImage: "checkmark.circle.fill",
                 color: .green
             )
@@ -153,7 +153,7 @@ struct QRScannerView: View {
                 .foregroundStyle(.white)
                 .accessibilityHidden(true)
 
-            Text("Scanning for check-in code...")
+            Text("Scanning for invitation code...")
                 .font(.headline)
                 .foregroundStyle(.white)
 
@@ -293,7 +293,7 @@ struct QRScannerView: View {
 
             HStack(spacing: 12) {
                 StatsBadge(label: "Invitations", value: stats.invitations, color: .blue)
-                StatsBadge(label: "Check-ins", value: stats.checkIns, color: .green)
+                StatsBadge(label: "Entries", value: stats.checkIns, color: .green)
                 StatsBadge(label: "Unused", value: stats.unused, color: .orange)
             }
         }
@@ -352,16 +352,24 @@ struct QRScannerView: View {
 
     private func recordedAnnouncement(for result: ScannerCheckInResult) -> String {
         guard let additionalGuestCount = result.additionalGuestCount else {
-            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone")
+            return String(
+                localized: "Entry \(result.checkInCount, format: .number) of \(result.allowedEntryCount, format: .number) recorded on this phone."
+            )
         }
 
         switch additionalGuestCount {
         case 0:
-            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone. No additional guests.")
+            return String(
+                localized: "Entry \(result.checkInCount, format: .number) of \(result.allowedEntryCount, format: .number) recorded on this phone. No additional guests."
+            )
         case 1:
-            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guest allowed.")
+            return String(
+                localized: "Entry \(result.checkInCount, format: .number) of \(result.allowedEntryCount, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guest may enter together."
+            )
         default:
-            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guests allowed.")
+            return String(
+                localized: "Entry \(result.checkInCount, format: .number) of \(result.allowedEntryCount, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guests may enter together."
+            )
         }
     }
 

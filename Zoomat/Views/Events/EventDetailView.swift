@@ -91,7 +91,7 @@ struct EventDetailView: View {
             InviteDetailView(invite: invite)
         }
         .confirmationDialog(
-            "Delete this invitation and all its check-ins?",
+            "Delete this invitation and all its recorded entries?",
             isPresented: Binding(
                 get: { inviteToDelete != nil },
                 set: { if !$0 { inviteToDelete = nil } }
@@ -243,9 +243,15 @@ struct InviteRowView: View {
                     .font(.headline)
 
                 if let contact = invite.contact {
-                    if let contactInfo = contact.phone ?? contact.email {
+                    if let contactInfo = contact.phoneNumbers.first ?? contact.email {
                         Text(contactInfo)
                             .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if contact.phoneNumbers.count > 1 {
+                        Text("+\(contact.phoneNumbers.count - 1, format: .number) more")
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 } else {
@@ -260,9 +266,11 @@ struct InviteRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("\(invite.checkIns.count, format: .number) check-ins")
+                Text(
+                    "Entries used: \(invite.checkIns.count, format: .number) of \(invite.allowedEntryCount, format: .number)"
+                )
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(invite.hasReachedEntryLimit ? Color.red : Color.secondary)
             }
 
             Spacer()

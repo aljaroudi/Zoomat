@@ -18,7 +18,9 @@ struct ImportContactsView: View {
             return deviceContacts
         }
         return deviceContacts.filter { contact in
-            "\(contact.givenName) \(contact.familyName)".localizedStandardContains(searchText)
+            contact.zoomatDisplayName.localizedStandardContains(searchText) ||
+            contact.emailAddresses.contains { ($0.value as String).localizedStandardContains(searchText) } ||
+            contact.phoneNumbers.contains { $0.value.stringValue.localizedStandardContains(searchText) }
         }
     }
     
@@ -106,12 +108,11 @@ struct ImportContactsView: View {
         }
         
         // Fetch contacts
-        let keys = [
-            CNContactGivenNameKey,
-            CNContactFamilyNameKey,
-            CNContactEmailAddressesKey,
-            CNContactPhoneNumbersKey
-        ] as [CNKeyDescriptor]
+        let keys: [CNKeyDescriptor] = [
+            CNContactFormatter.descriptorForRequiredKeys(for: .fullName),
+            CNContactEmailAddressesKey as CNKeyDescriptor,
+            CNContactPhoneNumbersKey as CNKeyDescriptor
+        ]
         
         let request = CNContactFetchRequest(keysToFetch: keys)
         
@@ -121,7 +122,7 @@ struct ImportContactsView: View {
                 contacts.append(contact)
             }
             deviceContacts = contacts.sorted { 
-                "\($0.givenName) \($0.familyName)" < "\($1.givenName) \($1.familyName)"
+                $0.zoomatDisplayName.localizedStandardCompare($1.zoomatDisplayName) == .orderedAscending
             }
         } catch {
             accessErrorMessage = "Failed to load contacts: \(error.localizedDescription)"
@@ -134,11 +135,16 @@ struct ImportContactsView: View {
                 continue
             }
             
-            let name = "\(cnContact.givenName) \(cnContact.familyName)".trimmingCharacters(in: .whitespaces)
+            let name = cnContact.zoomatDisplayName
             let email = cnContact.emailAddresses.first?.value as String?
-            let phone = cnContact.phoneNumbers.first?.value.stringValue
+            let phoneNumbers = cnContact.phoneNumbers.map(\.value.stringValue)
             
-            let contact = Contact(name: name, phone: phone, email: email)
+            let contact = Contact(
+                name: name,
+                phone: phoneNumbers.first,
+                additionalPhoneNumbers: Array(phoneNumbers.dropFirst()),
+                email: email
+            )
             modelContext.insert(contact)
         }
         
@@ -159,7 +165,7 @@ struct DeviceContactRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(contact.givenName) \(contact.familyName)")
+                Text(contact.zoomatDisplayName)
                     .font(.headline)
 
                 if let email = contact.emailAddresses.first?.value as String? {
@@ -168,8 +174,8 @@ struct DeviceContactRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let phone = contact.phoneNumbers.first?.value.stringValue {
-                    Text(phone)
+                ForEach(contact.phoneNumbers, id: \.identifier) { phone in
+                    Text(phone.value.stringValue)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -182,6 +188,13 @@ struct DeviceContactRow: View {
                 .font(.title3)
         }
         .padding(.vertical, 6)
+    }
+}
+
+private extension CNContact {
+    var zoomatDisplayName: String {
+        CNContactFormatter.string(from: self, style: .fullName)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }
 

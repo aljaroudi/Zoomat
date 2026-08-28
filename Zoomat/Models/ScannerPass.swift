@@ -11,7 +11,7 @@ extension UTType {
 
 struct ScannerPass: Codable, Equatable {
     static let currentVersion = 1
-    static let maximumFileSize = 10 * 1_024 * 1_024
+    static let maximumFileSize = 50 * 1_024 * 1_024
     static let maximumInvites = 10_000
 
     let version: Int
@@ -26,6 +26,7 @@ struct ScannerPass: Codable, Equatable {
         let expirationDate: Date?
         let address: String?
         let defaultAdditionalGuestCount: Int?
+        let cardDesign: CardDesignSnapshot?
 
         init(
             id: UUID,
@@ -34,7 +35,8 @@ struct ScannerPass: Codable, Equatable {
             date: Date,
             expirationDate: Date?,
             address: String?,
-            defaultAdditionalGuestCount: Int? = nil
+            defaultAdditionalGuestCount: Int? = nil,
+            cardDesign: CardDesignSnapshot? = nil
         ) {
             self.id = id
             self.title = title
@@ -43,7 +45,15 @@ struct ScannerPass: Codable, Equatable {
             self.expirationDate = expirationDate
             self.address = address
             self.defaultAdditionalGuestCount = defaultAdditionalGuestCount
+            self.cardDesign = cardDesign
         }
+    }
+
+    struct CardDesignSnapshot: Codable, Equatable {
+        let imageData: Data?
+        let qrPositionX: Double
+        let qrPositionY: Double
+        let qrSize: Double
     }
 
     struct InviteSnapshot: Codable, Equatable {
@@ -51,17 +61,20 @@ struct ScannerPass: Codable, Equatable {
         let created: Date
         let displayName: String
         let additionalGuestCount: Int?
+        let allowedEntryCount: Int?
 
         init(
             id: UUID,
             created: Date,
             displayName: String,
-            additionalGuestCount: Int? = nil
+            additionalGuestCount: Int? = nil,
+            allowedEntryCount: Int? = nil
         ) {
             self.id = id
             self.created = created
             self.displayName = displayName
             self.additionalGuestCount = additionalGuestCount
+            self.allowedEntryCount = allowedEntryCount
         }
     }
 
@@ -81,7 +94,13 @@ struct ScannerPass: Codable, Equatable {
                 date: event.date,
                 expirationDate: event.expirationDate,
                 address: event.address,
-                defaultAdditionalGuestCount: event.defaultAdditionalGuestCount
+                defaultAdditionalGuestCount: event.defaultAdditionalGuestCount,
+                cardDesign: CardDesignSnapshot(
+                    imageData: event.imageData,
+                    qrPositionX: event.qrPositionX,
+                    qrPositionY: event.qrPositionY,
+                    qrSize: event.qrSize
+                )
             ),
             invites: event.invites
                 .sorted { $0.created < $1.created }
@@ -90,7 +109,8 @@ struct ScannerPass: Codable, Equatable {
                         id: $0.id,
                         created: $0.created,
                         displayName: $0.displayName,
-                        additionalGuestCount: $0.effectiveAdditionalGuestCount
+                        additionalGuestCount: $0.effectiveAdditionalGuestCount,
+                        allowedEntryCount: $0.allowedEntryCount
                     )
                 }
         )
@@ -171,15 +191,32 @@ struct ScannerPass: Codable, Equatable {
                 throw ScannerPassError.invalidFile
             }
             if let additionalGuestCount = invite.additionalGuestCount,
-               !(0...10).contains(additionalGuestCount) {
+               additionalGuestCount < 0 {
                 throw ScannerPassError.invalidGuestAllowance
+            }
+            if let allowedEntryCount = invite.allowedEntryCount,
+               allowedEntryCount < 1 {
+                throw ScannerPassError.invalidEntryLimit
             }
         }
 
         if let defaultAdditionalGuestCount = event.defaultAdditionalGuestCount,
-           !(0...10).contains(defaultAdditionalGuestCount) {
+           defaultAdditionalGuestCount < 0 {
             throw ScannerPassError.invalidGuestAllowance
         }
+
+        if let cardDesign = event.cardDesign,
+           !cardDesign.isValid {
+            throw ScannerPassError.invalidCardDesign
+        }
+    }
+}
+
+private extension ScannerPass.CardDesignSnapshot {
+    var isValid: Bool {
+        qrPositionX.isFinite && (0...1).contains(qrPositionX) &&
+        qrPositionY.isFinite && (0...1).contains(qrPositionY) &&
+        qrSize.isFinite && (0.1...0.9).contains(qrSize)
     }
 }
 
@@ -190,6 +227,8 @@ enum ScannerPassError: LocalizedError, Equatable {
     case tooManyInvites
     case duplicateInvite
     case invalidGuestAllowance
+    case invalidEntryLimit
+    case invalidCardDesign
     case conflictingInvite
 
     var errorDescription: String? {
@@ -206,6 +245,10 @@ enum ScannerPassError: LocalizedError, Equatable {
             String(localized: "This scanner pass contains duplicate invitations.")
         case .invalidGuestAllowance:
             String(localized: "This scanner pass contains an invalid guest allowance.")
+        case .invalidEntryLimit:
+            String(localized: "This scanner pass contains an invalid entry limit.")
+        case .invalidCardDesign:
+            String(localized: "This scanner pass contains an invalid invitation card design.")
         case .conflictingInvite:
             String(localized: "An invitation in this scanner pass belongs to another local event.")
         }
@@ -237,6 +280,12 @@ enum ScannerPassImporter {
             if let defaultAdditionalGuestCount = pass.event.defaultAdditionalGuestCount {
                 event.defaultAdditionalGuestCount = defaultAdditionalGuestCount
             }
+            if let cardDesign = pass.event.cardDesign {
+                event.imageData = cardDesign.imageData
+                event.qrPositionX = cardDesign.qrPositionX
+                event.qrPositionY = cardDesign.qrPositionY
+                event.qrSize = cardDesign.qrSize
+            }
             event.updated = .now
         } else {
             event = Event(
@@ -245,7 +294,11 @@ enum ScannerPassImporter {
                 date: pass.event.date,
                 expirationDate: pass.event.expirationDate,
                 address: pass.event.address,
-                defaultAdditionalGuestCount: pass.event.defaultAdditionalGuestCount ?? 0
+                defaultAdditionalGuestCount: pass.event.defaultAdditionalGuestCount ?? 0,
+                imageData: pass.event.cardDesign?.imageData,
+                qrPositionX: pass.event.cardDesign?.qrPositionX ?? 0.5,
+                qrPositionY: pass.event.cardDesign?.qrPositionY ?? 0.5,
+                qrSize: pass.event.cardDesign?.qrSize ?? 0.3
             )
             event.id = pass.event.id
             context.insert(event)
@@ -264,12 +317,14 @@ enum ScannerPassImporter {
                     } else if invite.contact == nil {
                         invite.additionalGuestCountOverride = nil
                     }
+                    invite.allowedEntryCount = snapshot.allowedEntryCount ?? 1
                 } else {
                     let invite = Invite(
                         contact: nil,
                         event: event,
                         contactName: snapshot.displayName,
-                        additionalGuestCountOverride: snapshot.additionalGuestCount
+                        additionalGuestCountOverride: snapshot.additionalGuestCount,
+                        allowedEntryCount: snapshot.allowedEntryCount ?? 1
                     )
                     invite.id = snapshot.id
                     invite.created = snapshot.created

@@ -1,12 +1,23 @@
-Guest allowances
+Guest allowances and allowed entries
 
 - Create an event without changing Guest Allowance. Confirm its default is 0 additional guests.
-- Create and edit events with allowances from 0 through 10.
+- Create and edit events with allowances above 10.
 - Add named invitations using the event default, then change the event default and confirm those invitations update.
 - Override one named invitation with a custom allowance, including 0, and confirm later event-default changes do not affect it.
 - Switch an overridden invitation back to Event Default.
-- Confirm blank/general-admission invitations do not show a guest allowance and can be scanned repeatedly.
+- Create contact and blank invitations with Allowed Entries set above 1.
+- Confirm each invitation defaults to 1 allowed entry and later scans are rejected without increasing the count.
+- Confirm Additional Guests explains people entering together, while Allowed Entries explains successful scans.
 - Scan named invitations and confirm the recorded result shows and announces the correct guest allowance.
+
+Contacts and sharing
+
+- Import a device contact with multiple phone numbers. Confirm every number appears, persists, and is searchable.
+- Edit multiple phone numbers using one number per line.
+- Share a scanner pass with an invitation image. Import it on another phone and generate matching cards.
+- From an invitation, test Share Image, Save to Photos, and Open WhatsApp Chat.
+- Confirm saved Photos show the guest and event in the caption.
+- Confirm WhatsApp prompts for a number when a contact has several and rejects local-only formats.
 
 Localization
 

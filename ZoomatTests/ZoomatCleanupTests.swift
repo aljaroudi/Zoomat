@@ -1,6 +1,7 @@
 import XCTest
 import SwiftData
 import UIKit
+import ImageIO
 @testable import Zoomat
 
 final class ZoomatCleanupTests: XCTestCase {
@@ -96,11 +97,11 @@ final class ZoomatCleanupTests: XCTestCase {
     }
 
     @MainActor
-    func testRepeatedScansRecordEveryCheckIn() throws {
+    func testAllowedEntriesPermitConfiguredNumberOfScans() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let event = Event(title: "Event", date: .now)
-        let invite = Invite(contact: nil, event: event)
+        let invite = Invite(contact: nil, event: event, allowedEntryCount: 2)
         context.insert(event)
         context.insert(invite)
         try context.save()
@@ -108,6 +109,30 @@ final class ZoomatCleanupTests: XCTestCase {
         XCTAssertEqual(try invite.recordCheckIn(in: context), 1)
         XCTAssertEqual(try invite.recordCheckIn(in: context), 2)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 2)
+        XCTAssertThrowsError(try invite.recordCheckIn(in: context)) { error in
+            XCTAssertEqual(error as? InviteCheckInError, .entryLimitReached(2))
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 2)
+    }
+
+    @MainActor
+    func testInviteDefaultsToOneAllowedEntry() {
+        let invite = Invite(contact: nil, event: Event(title: "Event", date: .now))
+
+        XCTAssertEqual(invite.allowedEntryCount, 1)
+    }
+
+    @MainActor
+    func testContactPreservesOrderedUniquePhoneNumbers() {
+        let contact = Contact(
+            name: "Guest",
+            phone: " +966 50 000 0000 ",
+            additionalPhoneNumbers: ["+966 11 000 0000", "+966 50 000 0000", ""]
+        )
+
+        XCTAssertEqual(contact.phone, "+966 50 000 0000")
+        XCTAssertEqual(contact.additionalPhoneNumbers, ["+966 11 000 0000"])
+        XCTAssertEqual(contact.phoneNumbers, ["+966 50 000 0000", "+966 11 000 0000"])
     }
 
     @MainActor
@@ -203,6 +228,25 @@ final class ZoomatCleanupTests: XCTestCase {
     }
 
     @MainActor
+    func testInvitationJPEGStoresGuestAndEventInIPTCCaption() throws {
+        let event = Event(title: "Wedding", date: .now)
+        let invite = Invite(contact: nil, event: event, contactName: "Layla")
+        let data = try XCTUnwrap(invite.generateInvitationCardWithMetadata())
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let properties = try XCTUnwrap(
+            CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
+        )
+        let iptc = try XCTUnwrap(
+            properties[kCGImagePropertyIPTCDictionary as String] as? [String: Any]
+        )
+
+        XCTAssertEqual(
+            iptc[kCGImagePropertyIPTCCaptionAbstract as String] as? String,
+            "Layla — Wedding"
+        )
+    }
+
+    @MainActor
     func testStoreReopenPreservesLegacyDataAndRelationships() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -216,7 +260,11 @@ final class ZoomatCleanupTests: XCTestCase {
         do {
             let container = try ModelContainer(for: schema, configurations: configuration)
             let context = container.mainContext
-            let contact = Contact(name: "Legacy Contact")
+            let contact = Contact(
+                name: "Legacy Contact",
+                phone: "+966500000001",
+                additionalPhoneNumbers: ["+966500000002"]
+            )
             let event = Event(
                 title: "Legacy Event",
                 date: .now,
@@ -244,8 +292,10 @@ final class ZoomatCleanupTests: XCTestCase {
         XCTAssertEqual(events[0].expirationDate, Date.distantPast)
         XCTAssertEqual(events[0].defaultAdditionalGuestCount, 2)
         XCTAssertEqual(invites[0].contact?.name, "Legacy Contact")
+        XCTAssertEqual(contacts[0].phoneNumbers, ["+966500000001", "+966500000002"])
         XCTAssertEqual(invites[0].additionalGuestCountOverride, 1)
         XCTAssertEqual(invites[0].effectiveAdditionalGuestCount, 1)
+        XCTAssertEqual(invites[0].allowedEntryCount, 1)
         XCTAssertEqual(checkIns[0].invite.id, invites[0].id)
     }
 

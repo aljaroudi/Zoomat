@@ -25,7 +25,7 @@ struct ContactListView: View {
         return contacts.filter { contact in
             contact.name.localizedStandardContains(searchText) ||
             contact.email?.localizedStandardContains(searchText) == true ||
-            contact.phone?.localizedStandardContains(searchText) == true
+            contact.phoneNumbers.contains { $0.localizedStandardContains(searchText) }
         }
     }
 
@@ -68,7 +68,7 @@ struct ContactListView: View {
                 ImportContactsView()
             }
             .confirmationDialog(
-                "Delete this contact and all linked invitations and check-ins?",
+                "Delete this contact and all linked invitations and recorded entries?",
                 isPresented: Binding(
                     get: { contactToDelete != nil },
                     set: { if !$0 { contactToDelete = nil } }
@@ -142,10 +142,16 @@ struct ContactRowView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let phone = contact.phone {
+            if let phone = contact.phoneNumbers.first {
                 Text(phone)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+
+                if contact.phoneNumbers.count > 1 {
+                    Text(additionalPhoneNumbersText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if !contact.invites.isEmpty {
@@ -163,6 +169,15 @@ struct ContactRowView: View {
             "\(contact.invites.count, format: .number) invite"
         } else {
             "\(contact.invites.count, format: .number) invites"
+        }
+    }
+
+    private var additionalPhoneNumbersText: String {
+        let count = contact.phoneNumbers.count - 1
+        if count == 1 {
+            return String(localized: "\(count, format: .number) more phone number")
+        } else {
+            return String(localized: "\(count, format: .number) more phone numbers")
         }
     }
 }
