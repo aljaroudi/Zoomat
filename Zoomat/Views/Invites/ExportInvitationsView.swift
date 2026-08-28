@@ -18,6 +18,7 @@ struct ExportInvitationsView: View {
     @State private var shareImageURLs: [URL] = []
     @State private var exportMessage: String?
     @State private var exportDirectory: URL?
+    @State private var savedMessage: String?
 
     init(event: Event) {
         self.event = event
@@ -46,7 +47,19 @@ struct ExportInvitationsView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Export (\(selectedInviteIDs.count, format: .number))", action: prepareInvitations)
+                    Menu {
+                        Button("Share Images", systemImage: "square.and.arrow.up") {
+                            prepareInvitations(saveToPhotos: false)
+                        }
+                        Button("Save to Photos", systemImage: "square.and.arrow.down") {
+                            prepareInvitations(saveToPhotos: true)
+                        }
+                    } label: {
+                        Label(
+                            "Export (\(selectedInviteIDs.count, format: .number))",
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
                         .disabled(selectedInviteIDs.isEmpty || isGenerating)
                 }
             }
@@ -66,6 +79,17 @@ struct ExportInvitationsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text(exportMessage ?? "Please try again.")
+            }
+            .alert(
+                "Saved to Photos",
+                isPresented: Binding(
+                    get: { savedMessage != nil },
+                    set: { if !$0 { savedMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(savedMessage ?? "")
             }
             .onDisappear(perform: removeTemporaryFiles)
         }
@@ -141,7 +165,7 @@ struct ExportInvitationsView: View {
         }
     }
 
-    private func prepareInvitations() {
+    private func prepareInvitations(saveToPhotos: Bool) {
         let invitations = selectedInvites
         isGenerating = true
         generationProgress = 0
@@ -163,6 +187,7 @@ struct ExportInvitationsView: View {
             }
 
             var failures = 0
+            var artifacts: [InvitationImageArtifact] = []
             for (index, invite) in invitations.enumerated() {
                 defer { generationProgress += 1 }
                 guard let imageData = invite.generateInvitationCardWithMetadata() else {
@@ -170,8 +195,16 @@ struct ExportInvitationsView: View {
                     continue
                 }
 
-                let safeName = invite.displayName.replacingOccurrences(of: "/", with: "-")
-                let fileURL = directory.appendingPathComponent("\(safeName)_\(index + 1).jpg")
+                let safeName = invite.displayName.replacing("/", with: "-")
+                let filename = "\(safeName)_\(index + 1).jpg"
+                artifacts.append(InvitationImageArtifact(data: imageData, filename: filename))
+
+                guard !saveToPhotos else {
+                    await Task.yield()
+                    continue
+                }
+
+                let fileURL = directory.appendingPathComponent(filename)
                 do {
                     try imageData.write(to: fileURL, options: .atomic)
                     shareImageURLs.append(fileURL)
@@ -182,7 +215,20 @@ struct ExportInvitationsView: View {
             }
 
             isGenerating = false
-            if failures == 0 {
+            if saveToPhotos {
+                do {
+                    try await InvitationPhotoSaver.save(artifacts)
+                    if failures == 0 {
+                        savedMessage = String(
+                            localized: "\(artifacts.count, format: .number) invitation images saved with guest names in their captions."
+                        )
+                    } else {
+                        exportMessage = String(localized: "\(failures, format: .number) invitations could not be prepared.")
+                    }
+                } catch {
+                    exportMessage = error.localizedDescription
+                }
+            } else if failures == 0 {
                 showingShareSheet = true
             } else {
                 exportMessage = String(localized: "\(failures, format: .number) invitations could not be prepared.")
@@ -207,10 +253,17 @@ struct InviteSelectionRow: View {
                 Text(invite.displayName)
                     .font(.headline)
 
-                if let contact = invite.contact, let contactInfo = contact.phone ?? contact.email {
+                if let contact = invite.contact,
+                   let contactInfo = contact.phoneNumbers.first ?? contact.email {
                     Text(contactInfo)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+
+                    if contact.phoneNumbers.count > 1 {
+                        Text("+\(contact.phoneNumbers.count - 1, format: .number) more")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 } else if invite.contact == nil {
                     Text("General admission")
                         .font(.subheadline)

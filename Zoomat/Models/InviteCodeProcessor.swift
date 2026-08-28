@@ -7,12 +7,14 @@ struct ScannerCheckInResult: Equatable {
     let invitationName: String
     let eventTitle: String
     let additionalGuestCount: Int?
+    let allowedEntryCount: Int
     let checkInCount: Int
 }
 
 enum InviteCodeProcessingError: LocalizedError, Equatable {
     case invalidCode
     case invitationNotFound
+    case entryLimitReached(Int)
     case checkInFailed
 
     var errorDescription: String? {
@@ -21,8 +23,10 @@ enum InviteCodeProcessingError: LocalizedError, Equatable {
             String(localized: "QR code format is invalid.")
         case .invitationNotFound:
             String(localized: "Invitation not found.")
+        case .entryLimitReached(let limit):
+            String(localized: "This invitation has used all \(limit, format: .number) allowed entries on this phone.")
         case .checkInFailed:
-            String(localized: "The check-in could not be saved. Please try again.")
+            String(localized: "The entry could not be recorded. Please try again.")
         }
     }
 
@@ -30,8 +34,10 @@ enum InviteCodeProcessingError: LocalizedError, Equatable {
         switch self {
         case .invalidCode, .invitationNotFound:
             String(localized: "Invalid Code")
+        case .entryLimitReached:
+            String(localized: "Entry Limit Reached")
         case .checkInFailed:
-            String(localized: "Couldn’t Record Check-In")
+            String(localized: "Couldn’t Record Entry")
         }
     }
 }
@@ -74,8 +80,11 @@ struct SwiftDataInviteCheckInStore: InviteCheckInStoring {
                 invitationName: invitationName,
                 eventTitle: eventTitle,
                 additionalGuestCount: additionalGuestCount,
+                allowedEntryCount: invite.allowedEntryCount,
                 checkInCount: count
             )
+        } catch InviteCheckInError.entryLimitReached(let limit) {
+            throw InviteCodeProcessingError.entryLimitReached(limit)
         } catch {
             throw InviteCodeProcessingError.checkInFailed
         }

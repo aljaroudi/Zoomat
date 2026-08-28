@@ -19,6 +19,8 @@
 	</array>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Zoomat saves invitation images to your photo library when you choose Save to Photos.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

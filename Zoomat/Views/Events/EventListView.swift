@@ -50,7 +50,7 @@ struct EventListView: View {
                 CreateEventView()
             }
             .confirmationDialog(
-                "Delete this event and all its invitations and check-ins?",
+                "Delete this event and all its invitations and recorded entries?",
                 isPresented: Binding(
                     get: { eventToDelete != nil },
                     set: { if !$0 { eventToDelete = nil } }

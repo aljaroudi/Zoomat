@@ -32,6 +32,7 @@ final class InviteCodeScannerTests: XCTestCase {
             invitationName: "Guest",
             eventTitle: "Event",
             additionalGuestCount: 2,
+            allowedEntryCount: 3,
             checkInCount: 1
         )
         let store = FakeInviteCheckInStore(result: .success(expected))
@@ -71,7 +72,7 @@ final class InviteCodeScannerTests: XCTestCase {
             defaultAdditionalGuestCount: 2
         )
         let contact = Contact(name: "Guest")
-        let invite = Invite(contact: contact, event: event)
+        let invite = Invite(contact: contact, event: event, allowedEntryCount: 2)
         context.insert(contact)
         context.insert(event)
         context.insert(invite)
@@ -84,8 +85,34 @@ final class InviteCodeScannerTests: XCTestCase {
         XCTAssertEqual(first.invitationName, "Guest")
         XCTAssertEqual(first.eventTitle, "Event")
         XCTAssertEqual(first.additionalGuestCount, 2)
+        XCTAssertEqual(first.allowedEntryCount, 2)
         XCTAssertEqual(first.checkInCount, 1)
         XCTAssertEqual(second.checkInCount, 2)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 2)
+    }
+
+    @MainActor
+    func testRealStoreRejectsEntryAfterLimitWithoutMutation() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let event = Event(title: "Event", date: .now)
+        let invite = Invite(contact: nil, event: event, allowedEntryCount: 1)
+        context.insert(event)
+        context.insert(invite)
+        try context.save()
+        let processor = InviteCodeProcessor(context: context)
+
+        _ = try processor.process(invite.id.uuidString)
+
+        XCTAssertThrowsError(try processor.process(invite.id.uuidString)) { error in
+            XCTAssertEqual(error as? InviteCodeProcessingError, .entryLimitReached(1))
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 1)
+
+        invite.allowedEntryCount = 2
+        try context.save()
+        let raisedLimitResult = try processor.process(invite.id.uuidString)
+        XCTAssertEqual(raisedLimitResult.checkInCount, 2)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CheckIn>()), 2)
     }
 

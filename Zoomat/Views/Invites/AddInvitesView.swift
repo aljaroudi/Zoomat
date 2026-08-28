@@ -27,6 +27,7 @@ struct AddInvitesView: View {
     @State private var showingCreateContact = false
     @State private var usesEventDefault = true
     @State private var customAdditionalGuestCount: Int
+    @State private var allowedEntryCount = 1
 
     // Blank invite settings
     @State private var blankInviteQuantity = 1
@@ -48,7 +49,7 @@ struct AddInvitesView: View {
         return available.filter { contact in
             contact.name.localizedStandardContains(searchText) ||
             contact.email?.localizedStandardContains(searchText) == true ||
-            contact.phone?.localizedStandardContains(searchText) == true
+            contact.phoneNumbers.contains { $0.localizedStandardContains(searchText) }
         }
     }
 
@@ -134,6 +135,8 @@ struct AddInvitesView: View {
             } footer: {
                 Text("The number of different invitation cards to create.")
             }
+
+            allowedEntriesSection
         }
     }
 
@@ -164,7 +167,7 @@ struct AddInvitesView: View {
                         format: .number
                     )
                 } else {
-                    Stepper(value: $customAdditionalGuestCount, in: 0...10) {
+                    Stepper(value: $customAdditionalGuestCount, in: 0...Int.max) {
                         LabeledContent(
                             "Additional Guests",
                             value: customAdditionalGuestCount,
@@ -175,8 +178,10 @@ struct AddInvitesView: View {
             } header: {
                 Text("Guest Allowance")
             } footer: {
-                Text("This setting applies to every contact selected below. You can customize an invitation later.")
+                Text("Additional guests are people who may enter together with each successful scan. This setting applies to every selected contact.")
             }
+
+            allowedEntriesSection
 
             Section("Contacts") {
                 ForEach(filteredContacts) { contact in
@@ -210,7 +215,8 @@ struct AddInvitesView: View {
                 let invite = Invite(
                     contact: contact,
                     event: event,
-                    additionalGuestCountOverride: usesEventDefault ? nil : customAdditionalGuestCount
+                    additionalGuestCountOverride: usesEventDefault ? nil : customAdditionalGuestCount,
+                    allowedEntryCount: allowedEntryCount
                 )
                 modelContext.insert(invite)
             }
@@ -220,7 +226,8 @@ struct AddInvitesView: View {
                 let invite = Invite(
                     contact: nil,
                     event: event,
-                    contactName: String(localized: "General Invite #\(inviteNumber, format: .number)")
+                    contactName: String(localized: "General Invite #\(inviteNumber, format: .number)"),
+                    allowedEntryCount: allowedEntryCount
                 )
                 modelContext.insert(invite)
             }
@@ -242,6 +249,22 @@ struct AddInvitesView: View {
             "\(blankInviteQuantity, format: .number) cards"
         }
     }
+
+    private var allowedEntriesSection: some View {
+        Section {
+            Stepper(value: $allowedEntryCount, in: 1...Int.max) {
+                LabeledContent(
+                    "Allowed Entries",
+                    value: allowedEntryCount,
+                    format: .number
+                )
+            }
+        } header: {
+            Text("Entry Limit")
+        } footer: {
+            Text("Allowed entries are the number of times each invitation code can be successfully scanned on one scanner phone.")
+        }
+    }
 }
 
 struct ContactSelectionRow: View {
@@ -260,10 +283,16 @@ struct ContactSelectionRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let phone = contact.phone {
+                if let phone = contact.phoneNumbers.first {
                     Text(phone)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+
+                    if contact.phoneNumbers.count > 1 {
+                        Text("+\(contact.phoneNumbers.count - 1, format: .number) more")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 

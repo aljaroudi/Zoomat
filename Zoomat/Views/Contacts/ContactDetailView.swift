@@ -22,7 +22,7 @@ struct ContactDetailView: View {
                     LabeledContent("Email", value: email)
                 }
 
-                if let phone = contact.phone {
+                ForEach(contact.phoneNumbers, id: \.self) { phone in
                     LabeledContent("Phone", value: phone)
                 }
             }
@@ -38,7 +38,7 @@ struct ContactDetailView: View {
                                 .foregroundStyle(.secondary)
 
                             if !invite.checkIns.isEmpty {
-                                Label("\(invite.checkIns.count, format: .number) check-ins", systemImage: "checkmark.circle.fill")
+                                Label("\(invite.checkIns.count, format: .number) entries used", systemImage: "checkmark.circle.fill")
                                     .font(.footnote)
                                     .foregroundStyle(.green)
                             }
@@ -155,7 +155,7 @@ struct EditContactView: View {
     let contact: Contact
     @State private var name: String
     @State private var email: String
-    @State private var phone: String
+    @State private var phoneNumbersText: String
     @State private var errorMessage: String?
     @State private var showingDeleteConfirmation = false
 
@@ -163,7 +163,7 @@ struct EditContactView: View {
         self.contact = contact
         _name = State(initialValue: contact.name)
         _email = State(initialValue: contact.email ?? "")
-        _phone = State(initialValue: contact.phone ?? "")
+        _phoneNumbersText = State(initialValue: contact.phoneNumbers.joined(separator: "\n"))
     }
 
     var body: some View {
@@ -175,9 +175,10 @@ struct EditContactView: View {
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
-                    TextField("Phone (optional)", text: $phone)
+                    TextField("Phone numbers (optional)", text: $phoneNumbersText, axis: .vertical)
+                    .lineLimit(2...6)
                     .textContentType(.telephoneNumber)
-                    .keyboardType(.phonePad)
+                    .keyboardType(.numbersAndPunctuation)
                 }
 
                 Section {
@@ -199,7 +200,7 @@ struct EditContactView: View {
                 }
             }
             .confirmationDialog(
-                "Delete this contact and all linked invitations and check-ins?",
+                "Delete this contact and all linked invitations and recorded entries?",
                 isPresented: $showingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
@@ -212,10 +213,13 @@ struct EditContactView: View {
 
     private func saveContact() {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        let phoneNumbers = phoneNumbersText
+            .split(separator: "\n")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
         contact.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         contact.email = trimmedEmail.isEmpty ? nil : trimmedEmail
-        contact.phone = trimmedPhone.isEmpty ? nil : trimmedPhone
+        contact.phoneNumbers = phoneNumbers
 
         do {
             try modelContext.save()

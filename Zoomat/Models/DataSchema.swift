@@ -41,17 +41,45 @@ enum DataSchema: VersionedSchema {
 
         var name: String
         var phone: String?
+        var additionalPhoneNumbers: [String] = []
         var email: String?
 
         var invites: [Invite]
 
-        init(name: String, phone: String? = nil, email: String? = nil) {
+        init(
+            name: String,
+            phone: String? = nil,
+            additionalPhoneNumbers: [String] = [],
+            email: String? = nil
+        ) {
             self.id = .init()
             self.created = .init()
             self.name = name
-            self.phone = phone
+            self.phone = nil
+            self.additionalPhoneNumbers = []
             self.email = email
             self.invites = []
+            self.phoneNumbers = [phone].compactMap { $0 } + additionalPhoneNumbers
+        }
+
+        var phoneNumbers: [String] {
+            get {
+                Self.normalizedPhoneNumbers([phone].compactMap { $0 } + additionalPhoneNumbers)
+            }
+            set {
+                let normalized = Self.normalizedPhoneNumbers(newValue)
+                phone = normalized.first
+                additionalPhoneNumbers = Array(normalized.dropFirst())
+            }
+        }
+
+        private static func normalizedPhoneNumbers(_ numbers: [String]) -> [String] {
+            var seen = Set<String>()
+            return numbers.compactMap { number in
+                let trimmed = number.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
+                return trimmed
+            }
         }
 
         static var mock: Self {
@@ -158,10 +186,19 @@ enum DataSchema: VersionedSchema {
         // nil inherits the event default. Ignored for blank invitations.
         var additionalGuestCountOverride: Int?
 
+        // Number of successful scans allowed on each scanner phone.
+        var allowedEntryCount: Int = 1
+
         // How
         var qrToken: String { id.uuidString }
 
-        init(contact: Contact?, event: Event, contactName: String? = nil, additionalGuestCountOverride: Int? = nil) {
+        init(
+            contact: Contact?,
+            event: Event,
+            contactName: String? = nil,
+            additionalGuestCountOverride: Int? = nil,
+            allowedEntryCount: Int = 1
+        ) {
             self.id = .init()
             self.created = .init()
             self.contact = contact
@@ -169,6 +206,7 @@ enum DataSchema: VersionedSchema {
             self.checkIns = []
             self.event = event
             self.additionalGuestCountOverride = additionalGuestCountOverride
+            self.allowedEntryCount = max(allowedEntryCount, 1)
         }
 
         // Convenience initializer for backwards compatibility
@@ -205,8 +243,16 @@ enum DataSchema: VersionedSchema {
             checkIns.sorted { $0.created > $1.created }
         }
 
+        var hasReachedEntryLimit: Bool {
+            checkIns.count >= allowedEntryCount
+        }
+
         @discardableResult
         func recordCheckIn(in context: ModelContext) throws -> Int {
+            guard !hasReachedEntryLimit else {
+                throw InviteCheckInError.entryLimitReached(allowedEntryCount)
+            }
+
             let newCount = checkIns.count + 1
             let checkIn = CheckIn(invite: self)
             context.insert(checkIn)
@@ -230,6 +276,10 @@ enum DataSchema: VersionedSchema {
             }
         }
     }
+}
+
+enum InviteCheckInError: Error, Equatable {
+    case entryLimitReached(Int)
 }
 
 struct EventTimelinePartition {

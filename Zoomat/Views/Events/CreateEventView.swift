@@ -136,7 +136,7 @@ struct EditEventView: View {
                 }
             }
             .confirmationDialog(
-                "Delete this event and all its invitations and check-ins?",
+                "Delete this event and all its invitations and recorded entries?",
                 isPresented: $showingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
@@ -210,7 +210,7 @@ private struct EventForm<Footer: View>: View {
             }
 
             Section {
-                Stepper(value: $draft.defaultAdditionalGuestCount, in: 0...10) {
+                Stepper(value: $draft.defaultAdditionalGuestCount, in: 0...Int.max) {
                     LabeledContent(
                         "Additional Guests",
                         value: draft.defaultAdditionalGuestCount,
@@ -220,7 +220,7 @@ private struct EventForm<Footer: View>: View {
             } header: {
                 Text("Guest Allowance")
             } footer: {
-                Text("Shown during check-in for named invitations. Individual invitations can override this value.")
+                Text("Additional guests are people who may enter together with each successful scan. Individual invitations can override this value.")
             }
 
             Section("Invitation Card") {

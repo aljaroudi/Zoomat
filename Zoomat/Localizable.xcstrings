@@ -1863,6 +1863,496 @@
         }
       }
     },
+    "Allowed Entries" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول المسموح بها"
+          }
+        }
+      }
+    },
+    "Allowed entries are successful scans for this code on one scanner phone. Additional guests may enter together during each entry." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول هي عمليات المسح الناجحة لهذا الرمز على هاتف مسح واحد. يمكن للضيوف الإضافيين الدخول معًا في كل مرة."
+          }
+        }
+      }
+    },
+    "Allowed entries are the number of times each invitation code can be successfully scanned on one scanner phone." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول هي عدد المرات التي يمكن فيها مسح رمز كل دعوة بنجاح على هاتف مسح واحد."
+          }
+        }
+      }
+    },
+    "Allowed entries are the number of times this invitation code can be successfully scanned on one scanner phone." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول هي عدد المرات التي يمكن فيها مسح رمز هذه الدعوة بنجاح على هاتف مسح واحد."
+          }
+        }
+      }
+    },
+    "Choose a WhatsApp Number" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر رقم واتساب"
+          }
+        }
+      }
+    },
+    "Couldn’t Record Entry" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر تسجيل الدخول"
+          }
+        }
+      }
+    },
+    "Edit Allowed Entries" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعديل مرات الدخول المسموح بها"
+          }
+        }
+      }
+    },
+    "Entries" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول"
+          }
+        }
+      }
+    },
+    "Entries Used" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول المستخدمة"
+          }
+        }
+      }
+    },
+    "Entry %@ of %@ recorded on this phone." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تسجيل الدخول %@ من %@ على هذا الهاتف."
+          }
+        }
+      }
+    },
+    "Entry %@ of %@ recorded on this phone" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تسجيل الدخول %@ من %@ على هذا الهاتف"
+          }
+        }
+      }
+    },
+    "Entry History" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سجل مرات الدخول"
+          }
+        }
+      }
+    },
+    "Entry Limit" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حد مرات الدخول"
+          }
+        }
+      }
+    },
+    "Entry Limit Reached" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم بلوغ حد الدخول"
+          }
+        }
+      }
+    },
+    "Entry limit reached" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم بلوغ حد الدخول"
+          }
+        }
+      }
+    },
+    "No entries recorded" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم تُسجل مرات دخول"
+          }
+        }
+      }
+    },
+    "Open WhatsApp Chat" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فتح محادثة واتساب"
+          }
+        }
+      }
+    },
+    "Phone numbers (optional)" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أرقام الهاتف (اختياري)"
+          }
+        }
+      }
+    },
+    "Save to Photos" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حفظ في الصور"
+          }
+        }
+      }
+    },
+    "Saved to Photos" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم الحفظ في الصور"
+          }
+        }
+      }
+    },
+    "Scanning for invitation code..." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البحث عن رمز الدعوة..."
+          }
+        }
+      }
+    },
+    "Share Image" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشاركة الصورة"
+          }
+        }
+      }
+    },
+    "The entry could not be recorded. Please try again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر تسجيل الدخول. حاول مرة أخرى."
+          }
+        }
+      }
+    },
+    "This invitation has used all %@ allowed entries on this phone." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استخدمت هذه الدعوة جميع مرات الدخول المسموح بها وعددها %@ على هذا الهاتف."
+          }
+        }
+      }
+    },
+    "WhatsApp requires a phone number with an international country code, such as +966." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب واتساب رقم هاتف مع رمز دولة دولي، مثل ‎+966."
+          }
+        }
+      }
+    },
+    "%@ entries used" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم استخدام %@ من مرات الدخول"
+          }
+        }
+      }
+    },
+    "%@ entry used" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم استخدام دخول واحد (%@)"
+          }
+        }
+      }
+    },
+    "%@ more phone number" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رقم هاتف إضافي واحد (%@)"
+          }
+        }
+      }
+    },
+    "%@ more phone numbers" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ أرقام هاتف إضافية"
+          }
+        }
+      }
+    },
+    "+%@ more" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%@ إضافية"
+          }
+        }
+      }
+    },
+    "%@ invitation images saved with guest names in their captions." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم حفظ %@ من صور الدعوات مع أسماء الضيوف في أوصافها."
+          }
+        }
+      }
+    },
+    "Add an international phone number to this contact before opening WhatsApp." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أضف رقم هاتف دوليًا إلى جهة الاتصال هذه قبل فتح واتساب."
+          }
+        }
+      }
+    },
+    "Additional guests are people who may enter together with each successful scan. Individual invitations can override this value." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الضيوف الإضافيون هم الأشخاص الذين يمكنهم الدخول معًا عند كل مسح ناجح. يمكن تخصيص هذه القيمة لكل دعوة."
+          }
+        }
+      }
+    },
+    "Additional guests are people who may enter together with each successful scan. They do not use separate entries." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الضيوف الإضافيون هم الأشخاص الذين يمكنهم الدخول معًا عند كل مسح ناجح. لا يستخدمون مرات دخول منفصلة."
+          }
+        }
+      }
+    },
+    "Invitation image saved with the guest name in its caption." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم حفظ صورة الدعوة مع اسم الضيف في وصفها."
+          }
+        }
+      }
+    },
+    "Photo access is required to save invitations. Allow Zoomat to add photos in Settings." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يلزم إذن الصور لحفظ الدعوات. اسمح لتطبيق Zoomat بإضافة الصور من الإعدادات."
+          }
+        }
+      }
+    },
+    "Share Images" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشاركة الصور"
+          }
+        }
+      }
+    },
+    "The invitation image could not be prepared." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر تجهيز صورة الدعوة."
+          }
+        }
+      }
+    },
+    "This scanner pass contains an invalid entry limit." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتوي ملف المسح هذا على حد دخول غير صالح."
+          }
+        }
+      }
+    },
+    "This scanner pass contains an invalid invitation card design." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتوي ملف المسح هذا على تصميم بطاقة دعوة غير صالح."
+          }
+        }
+      }
+    },
+    "WhatsApp could not be opened." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر فتح واتساب."
+          }
+        }
+      }
+    },
+    "Additional guests are people who may enter together with each successful scan. This setting applies to every selected contact." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الضيوف الإضافيون هم الأشخاص الذين يمكنهم الدخول معًا عند كل مسح ناجح. يطبق هذا الإعداد على كل جهة اتصال محددة."
+          }
+        }
+      }
+    },
+    "Delete this contact and all linked invitations and recorded entries?" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد حذف جهة الاتصال هذه وكل الدعوات المرتبطة بها ومرات الدخول المسجلة؟"
+          }
+        }
+      }
+    },
+    "Delete this event and all its invitations and recorded entries?" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد حذف هذه الفعالية وكل دعواتها ومرات الدخول المسجلة؟"
+          }
+        }
+      }
+    },
+    "Delete this invitation and all its recorded entries?" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد حذف هذه الدعوة وكل مرات الدخول المسجلة لها؟"
+          }
+        }
+      }
+    },
+    "Entries used: %@ of %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرات الدخول المستخدمة: %@ من %@"
+          }
+        }
+      }
+    },
+    "Entry %@ of %@ recorded on this phone. No additional guests." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تسجيل الدخول %@ من %@ على هذا الهاتف. لا يوجد ضيوف إضافيون."
+          }
+        }
+      }
+    },
+    "Entry %@ of %@ recorded on this phone. %@ additional guest may enter together." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تسجيل الدخول %@ من %@ على هذا الهاتف. يمكن لضيف إضافي واحد (%@) الدخول معه."
+          }
+        }
+      }
+    },
+    "Entry %@ of %@ recorded on this phone. %@ additional guests may enter together." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تسجيل الدخول %@ من %@ على هذا الهاتف. يمكن لـ %@ من الضيوف الإضافيين الدخول معه."
+          }
+        }
+      }
+    },
     "Your data was left unchanged. Close and reopen Zoomat to try again.\n\n%@" : {
       "localizations" : {
         "ar" : {
