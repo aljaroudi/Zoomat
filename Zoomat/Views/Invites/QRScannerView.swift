@@ -6,11 +6,11 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
-@preconcurrency import AVFoundation
 
 struct QRScannerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var allInvites: [Invite]
     @State private var scanner = QRScanner()
     @State private var checkInStatus: CheckInStatus = .waiting
@@ -43,6 +43,7 @@ struct QRScannerView: View {
         }
         .onAppear {
             scanner.onCodeScanned = handleScannedCode
+            scanner.setSuspended(scenePhase != .active)
         }
         .onDisappear {
             scanner.deactivate()
@@ -51,6 +52,9 @@ struct QRScannerView: View {
             if case .waiting = status {
                 scanner.startScanning()
             }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            scanner.setSuspended(phase != .active)
         }
         .sensoryFeedback(trigger: checkInStatus) { _, status in
             switch status {
@@ -105,7 +109,7 @@ struct QRScannerView: View {
                     "Camera Access Denied",
                     description: String(localized: "Allow camera access in Settings to scan invitations."),
                     systemImage: "camera.fill.badge.xmark",
-                    showRetry: false
+                    showRetry: true
                 )
             case .unavailable:
                 cameraMessage(
@@ -122,15 +126,15 @@ struct QRScannerView: View {
                     showRetry: true
                 )
             }
-        case .recorded(let invite, let count):
+        case .recorded(let result):
             resultView(
-                invite: invite,
-                title: "Check-in #\(count, format: .number) recorded on this phone",
+                result: result,
+                title: "Check-in #\(result.checkInCount, format: .number) recorded on this phone",
                 systemImage: "checkmark.circle.fill",
                 color: .green
             )
-        case .failure(let reason):
-            failureView(reason: reason)
+        case .failure(let title, let reason):
+            failureView(title: title, reason: reason)
         }
     }
 
@@ -159,7 +163,12 @@ struct QRScannerView: View {
         .background(.ultraThinMaterial)
     }
 
-    private func resultView(invite: Invite, title: LocalizedStringKey, systemImage: String, color: Color) -> some View {
+    private func resultView(
+        result: ScannerCheckInResult,
+        title: LocalizedStringKey,
+        systemImage: String,
+        color: Color
+    ) -> some View {
         VStack(spacing: 24) {
             if let eventStats {
                 statsBar(stats: eventStats)
@@ -167,7 +176,7 @@ struct QRScannerView: View {
 
             Spacer()
 
-            Text(invite.displayName)
+            Text(result.invitationName)
                 .font(.largeTitle.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
@@ -175,7 +184,7 @@ struct QRScannerView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal)
 
-            if let allowanceText = invite.additionalGuestAllowanceText {
+            if let allowanceText = additionalGuestAllowanceText(for: result.additionalGuestCount) {
                 Label {
                     Text(allowanceText)
                         .font(.headline)
@@ -198,7 +207,7 @@ struct QRScannerView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
 
-            Text(invite.event.title)
+            Text(result.eventTitle)
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white.opacity(0.9))
@@ -214,7 +223,7 @@ struct QRScannerView: View {
         .background(color.opacity(0.65))
     }
 
-    private func failureView(reason: String) -> some View {
+    private func failureView(title: String, reason: String) -> some View {
         VStack(spacing: 24) {
             Spacer()
 
@@ -224,7 +233,7 @@ struct QRScannerView: View {
                 .foregroundStyle(.white)
                 .accessibilityHidden(true)
 
-            Text("Invalid Code")
+            Text(title)
                 .font(.largeTitle.bold())
                 .foregroundStyle(.white)
 
@@ -295,27 +304,19 @@ struct QRScannerView: View {
     }
 
     private func handleScannedCode(_ code: String) {
-        guard let id = UUID(uuidString: code) else {
-            showFailure("QR code format is invalid.")
-            return
-        }
-
-        let descriptor = FetchDescriptor<Invite>(predicate: #Predicate { $0.id == id })
         do {
-            guard let invite = try modelContext.fetch(descriptor).first else {
-                showFailure("Invitation not found.")
-                return
-            }
-
-            currentEventID = invite.event.id
-            let count = try invite.recordCheckIn(in: modelContext)
-            checkInStatus = .recorded(invite: invite, count: count)
+            let result = try InviteCodeProcessor(context: modelContext).process(code)
+            currentEventID = result.eventID
+            checkInStatus = .recorded(result)
             UIAccessibility.post(
                 notification: .announcement,
-                argument: recordedAnnouncement(for: invite, count: count)
+                argument: recordedAnnouncement(for: result)
             )
+        } catch let error as InviteCodeProcessingError {
+            showFailure(title: error.title, reason: error.localizedDescription)
         } catch {
-            showFailure(error.localizedDescription)
+            let fallback = InviteCodeProcessingError.checkInFailed
+            showFailure(title: fallback.title, reason: fallback.localizedDescription)
         }
     }
 
@@ -344,23 +345,35 @@ struct QRScannerView: View {
         }
     }
 
-    private func showFailure(_ reason: String) {
-        checkInStatus = .failure(reason: reason)
+    private func showFailure(title: String, reason: String) {
+        checkInStatus = .failure(title: title, reason: reason)
         UIAccessibility.post(notification: .announcement, argument: reason)
     }
 
-    private func recordedAnnouncement(for invite: Invite, count: Int) -> String {
-        guard let additionalGuestCount = invite.effectiveAdditionalGuestCount else {
-            return String(localized: "Check-in #\(count, format: .number) recorded on this phone")
+    private func recordedAnnouncement(for result: ScannerCheckInResult) -> String {
+        guard let additionalGuestCount = result.additionalGuestCount else {
+            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone")
         }
 
         switch additionalGuestCount {
         case 0:
-            return String(localized: "Check-in #\(count, format: .number) recorded on this phone. No additional guests.")
+            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone. No additional guests.")
         case 1:
-            return String(localized: "Check-in #\(count, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guest allowed.")
+            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guest allowed.")
         default:
-            return String(localized: "Check-in #\(count, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guests allowed.")
+            return String(localized: "Check-in #\(result.checkInCount, format: .number) recorded on this phone. \(additionalGuestCount, format: .number) additional guests allowed.")
+        }
+    }
+
+    private func additionalGuestAllowanceText(for count: Int?) -> LocalizedStringResource? {
+        guard let count else { return nil }
+        switch count {
+        case 0:
+            return "No additional guests"
+        case 1:
+            return "\(count, format: .number) additional guest"
+        default:
+            return "\(count, format: .number) additional guests"
         }
     }
 }
@@ -386,8 +399,8 @@ struct StatsBadge: View {
 
 enum CheckInStatus: Equatable {
     case waiting
-    case recorded(invite: Invite, count: Int)
-    case failure(reason: String)
+    case recorded(ScannerCheckInResult)
+    case failure(title: String, reason: String)
 }
 
 enum CameraState: Equatable {
@@ -414,137 +427,6 @@ struct QRScannerCameraView: UIViewRepresentable {
 
     func dismantleUIView(_ uiView: UIView, coordinator: ()) {
         scanner.deactivate()
-    }
-}
-
-@Observable
-@MainActor
-final class QRScanner: NSObject, AVCaptureMetadataOutputObjectsDelegate {
-    private let sessionQueue = DispatchQueue(label: "com.zooma.qr-scanner")
-    private var captureSession: AVCaptureSession?
-    private var previewLayer: AVCaptureVideoPreviewLayer?
-    private weak var previewView: UIView?
-    private var isProcessing = false
-    private var isActive = true
-
-    private(set) var cameraState: CameraState = .loading
-    var onCodeScanned: ((String) -> Void)?
-
-    func setupCamera(on view: UIView) {
-        guard isActive else { return }
-        previewView = view
-        cameraState = .loading
-
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            configureCamera(on: view)
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { [weak self, weak view] granted in
-                DispatchQueue.main.async {
-                    guard let self, let view, self.isActive else { return }
-                    granted ? self.configureCamera(on: view) : (self.cameraState = .denied)
-                }
-            }
-        case .denied, .restricted:
-            cameraState = .denied
-        @unknown default:
-            cameraState = .failed(String(localized: "Unknown camera authorization state."))
-        }
-    }
-
-    func retryCameraSetup() {
-        guard let previewView else { return }
-        isActive = true
-        stopScanning()
-        captureSession = nil
-        previewLayer?.removeFromSuperlayer()
-        previewLayer = nil
-        setupCamera(on: previewView)
-    }
-
-    private func configureCamera(on view: UIView) {
-        guard isActive else { return }
-        guard let device = AVCaptureDevice.default(for: .video) else {
-            cameraState = .unavailable
-            return
-        }
-
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            let output = AVCaptureMetadataOutput()
-            let session = AVCaptureSession()
-
-            guard session.canAddInput(input), session.canAddOutput(output) else {
-                cameraState = .failed(String(localized: "The camera could not be configured."))
-                return
-            }
-
-            session.addInput(input)
-            session.addOutput(output)
-            output.setMetadataObjectsDelegate(self, queue: .main)
-            output.metadataObjectTypes = [.qr]
-
-            let layer = AVCaptureVideoPreviewLayer(session: session)
-            layer.frame = view.bounds
-            layer.videoGravity = .resizeAspectFill
-            view.layer.addSublayer(layer)
-
-            captureSession = session
-            previewLayer = layer
-            cameraState = .ready
-            startScanning()
-        } catch {
-            cameraState = .failed(error.localizedDescription)
-        }
-    }
-
-    func updatePreviewFrame(to bounds: CGRect) {
-        previewLayer?.frame = bounds
-    }
-
-    func startScanning() {
-        guard isActive, cameraState == .ready, let session = captureSession else { return }
-        isProcessing = false
-        sessionQueue.async {
-            if !session.isRunning { session.startRunning() }
-        }
-    }
-
-    func stopScanning() {
-        guard let session = captureSession else { return }
-        sessionQueue.async {
-            if session.isRunning { session.stopRunning() }
-        }
-    }
-
-    func deactivate() {
-        guard isActive else { return }
-        isActive = false
-        onCodeScanned = nil
-        stopScanning()
-        previewLayer?.removeFromSuperlayer()
-        previewLayer = nil
-        previewView = nil
-    }
-
-    nonisolated func metadataOutput(
-        _ output: AVCaptureMetadataOutput,
-        didOutput metadataObjects: [AVMetadataObject],
-        from connection: AVCaptureConnection
-    ) {
-        guard let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
-              let value = object.stringValue else { return }
-
-        Task { @MainActor [weak self] in
-            self?.processScannedValue(value)
-        }
-    }
-
-    private func processScannedValue(_ value: String) {
-        guard isActive, !isProcessing else { return }
-        isProcessing = true
-        stopScanning()
-        onCodeScanned?(value)
     }
 }
 
